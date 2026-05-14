@@ -1,5 +1,6 @@
 
 import express from "express";
+import "express-async-errors";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import db, { initSchema, seedData } from "./src/lib/db.js";
@@ -9,8 +10,20 @@ import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import dotenv from "dotenv";
+import winston from "winston";
 
 dotenv.config();
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console()
+  ]
+});
 
 // Configure Cloudinary
 cloudinary.config({
@@ -41,18 +54,26 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.use((req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; font-src 'self' data: https://*.public.blob.vercel-storage.com https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.turso.io wss://*.turso.io;"
+    );
+    next();
+  });
+
   // Initialize DB Schema and Seed
   await initSchema();
   await seedData();
 
   // Create default admin if not exists
-  const adminExists = await db.execute("SELECT count(*) as count FROM admins");
+  const adminExists = await db.execute({ sql: "SELECT count(*) as count FROM admins WHERE username = ?", args: ["admis"] });
   if (Number(adminExists.rows[0].count) === 0) {
     const adminPass = process.env.ADMIN_PASSWORD || "admin123";
     const hashedPassword = await bcrypt.hash(adminPass, 10);
     await db.execute({
       sql: "INSERT INTO admins (username, password) VALUES (?, ?)",
-      args: ["admin", hashedPassword]
+      args: ["admis", hashedPassword]
     });
   }
 
@@ -310,6 +331,12 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.error("Unhandled error", { error: err.message, stack: err.stack, path: req.path });
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
+  });
+
   // Vite
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
@@ -320,7 +347,7 @@ async function startServer() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+  app.listen(PORT, () => logger.info(`Server on port ${PORT}`));
 }
 
 startServer();
