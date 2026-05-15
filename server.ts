@@ -87,20 +87,31 @@ async function startServer() {
     next();
   });
 
-  await seedData();
+  try {
+    await seedData();
+  } catch (error) {
+    console.error("ERREUR CRITIQUE FIREBASE : Impossible d'exécuter seedData. Connexion Firestore échouée !");
+    console.error(error);
+  }
 
   // Create default admin if not exists
-  const adminsRef = collection(db, 'admins');
-  const qAdmin = query(adminsRef, where("username", "==", "admis"));
-  const adminSnap = await getDocs(qAdmin);
-  
-  if (adminSnap.empty) {
-    const adminPass = process.env.ADMIN_PASSWORD || "admin123";
-    const hashedPassword = await bcrypt.hash(adminPass, 10);
-    await addDoc(collection(db, 'admins'), {
-      username: "admis",
-      password: hashedPassword
-    });
+  try {
+    const adminsRef = collection(db, 'admins');
+    const qAdmin = query(adminsRef, where("username", "==", "admis"));
+    const adminSnap = await getDocs(qAdmin);
+    
+    if (adminSnap.empty) {
+      const adminPass = process.env.ADMIN_PASSWORD || "rouky9323";
+      const hashedPassword = await bcrypt.hash(adminPass, 10);
+      await addDoc(collection(db, 'admins'), {
+        username: "admis",
+        password: hashedPassword
+      });
+      console.log("Admin account 'admis' created automatically.");
+    }
+  } catch (error) {
+    console.error("ERREUR CRITIQUE FIREBASE : Impossible de vérifier ou créer l'administrateur. Vérifiez vos variables d'environnement Firestore !");
+    console.error(error);
   }
 
   // --- API ROUTES ---
@@ -398,16 +409,21 @@ async function startServer() {
   });
 
   app.post("/api/admin/login", async (req, res) => {
-    const { username, password } = req.body;
-    const snap = await getDocs(query(collection(db, 'admins'), where("username", "==", username)));
-    if (!snap.empty) {
-      const admin = snap.docs[0].data();
-      if (await bcrypt.compare(password, admin.password)) {
-        const token = jwt.sign({ id: snap.docs[0].id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
-        return res.json({ token });
+    try {
+      const { username, password } = req.body;
+      const snap = await getDocs(query(collection(db, 'admins'), where("username", "==", username)));
+      if (!snap.empty) {
+        const admin = snap.docs[0].data();
+        if (await bcrypt.compare(password, admin.password)) {
+          const token = jwt.sign({ id: snap.docs[0].id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
+          return res.json({ token });
+        }
       }
+      res.status(401).json({ error: "Invalid credentials" });
+    } catch (error: any) {
+      console.error("Erreur détaillée lors de la connexion Firebase (/api/admin/login):", error);
+      res.status(500).json({ error: "Erreur de connexion Firestore", details: error.message });
     }
-    res.status(401).json({ error: "Invalid credentials" });
   });
 
   app.post("/api/admin/upload", authenticateToken, upload.single("image"), (req: any, res) => {
