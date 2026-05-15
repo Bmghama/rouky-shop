@@ -1,12 +1,12 @@
 
 export interface Product {
-  id: number;
+  id: string | number;
   name: string;
   description: string;
   long_description?: string;
   price: number;
   old_price?: number;
-  category_id: number;
+  category_id: string | number;
   category_name: string;
   sub_category?: string;
   image_url: string;
@@ -25,8 +25,8 @@ export interface Product {
 }
 
 export interface Review {
-  id: number;
-  product_id: number;
+  id: string | number;
+  product_id: string | number;
   product_name?: string;
   customer_name: string;
   rating: number;
@@ -38,7 +38,7 @@ export interface Review {
 }
 
 export interface Category {
-  id: number;
+  id: string | number;
   name: string;
 }
 

@@ -506,7 +506,7 @@ export default function ProductDetails() {
         {/* Customer Reviews Section */}
         <div className="mt-48 border-t border-neutral-100 pt-32">
           <ReviewSection 
-            productId={Number(id)} 
+            productId={id || ""} 
             avgRating={product.avg_rating} 
             reviewCount={product.review_count} 
           />

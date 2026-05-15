@@ -49,7 +49,7 @@ export function StarRating({ rating, max = 5, size = 16, onRatingChange, interac
 }
 
 interface ReviewSectionProps {
-  productId: number;
+  productId: string | number;
   avgRating?: number;
   reviewCount?: number;
 }

@@ -49,14 +49,14 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
     if (!files) return;
 
     for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append("image", file);
+      const uploadData = new FormData();
+      uploadData.append("image", file);
 
       try {
         const res = await fetch("/api/admin/upload", {
           method: "POST",
           headers: { "Authorization": `Bearer ${token}` },
-          body: formData
+          body: uploadData
         });
         const data = await res.json();
         if (data.success) {
