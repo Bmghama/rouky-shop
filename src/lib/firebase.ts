@@ -1,16 +1,23 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit } from "firebase/firestore";
 
-// Aide à la résolution d'environnement (Frontend Vite vs Backend Node)
+const getBrowserEnv = () => {
+  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+    return import.meta.env;
+  }
+  return {} as Record<string, string>;
+};
+
 const getEnvVar = (key: string, viteKey: string, fallback: string) => {
   if (typeof process !== "undefined" && process.env && process.env[key]) {
-    return process.env[key];
+    return process.env[key] as string;
   }
-  // @ts-ignore (import.meta.env n'est pas toujours typé pour Node)
-  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[viteKey]) {
-    // @ts-ignore
-    return import.meta.env[viteKey];
+
+  const browserEnv = getBrowserEnv();
+  if (browserEnv && browserEnv[viteKey]) {
+    return browserEnv[viteKey] as string;
   }
+
   return fallback;
 };
 

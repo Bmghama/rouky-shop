@@ -14,6 +14,20 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      conditions: ['browser'],
+      dedupe: ['firebase'],
+    },
+    optimizeDeps: {
+      include: ['firebase/app', 'firebase/firestore'],
+      exclude: ['firebase'],
+    },
+    build: {
+      commonjsOptions: {
+        transformMixedEsModules: true,
+      },
+    },
+    ssr: {
+      noExternal: ['firebase', 'firebase/app', 'firebase/firestore'],
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
