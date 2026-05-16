@@ -3,12 +3,13 @@ import { Stats, Product, Category } from "../../types.ts";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Users, ShoppingBag, BarChart3, Clock, 
-  TrendingUp, Package, Activity, LogOut,
+  TrendingUp, Package, Activity,
   Plus, Edit, Trash2, Search, Filter,
   AlertTriangle, Eye, MessageCircle, RefreshCw,
-  MoreVertical, Check, X as XIcon, Save, ArrowLeft, Star, MapPin
+  Check, X as XIcon, Star, MapPin
 } from "lucide-react";
 import { formatPrice, cn } from "../../lib/utils.ts";
+import AdminLayout from "./AdminLayout.tsx";
 import ProductForm from "./ProductForm.tsx";
 
 interface DashboardProps {
@@ -226,198 +227,148 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   });
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] flex flex-col md:flex-row font-sans">
-      {/* Sidebar */}
-      <aside className="w-full md:w-80 bg-editorial-text text-white md:h-screen sticky top-0 flex flex-col z-[70] shadow-2xl transition-all duration-500 overflow-hidden">
-        <div className="p-10 border-b border-white/5 relative overflow-hidden group">
-          <div className="absolute inset-0 bg-editorial-gold/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          <h2 className="text-3xl font-serif italic tracking-tight text-white relative z-10">Rouky Admin</h2>
-          <div className="flex items-center gap-3 mt-4 relative z-10">
-            <div className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse"></div>
-            <p className="text-[9px] label-caps tracking-[0.3em] text-editorial-gold font-bold">Système Actif</p>
+    <AdminLayout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      onLogout={onLogout}
+    >
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-12 gap-6">
+        <div>
+          <div className="flex items-center gap-4 mb-4">
+            <span className="w-12 h-[1px] bg-editorial-gold"></span>
+            <span className="label-caps text-editorial-gold font-bold !text-[9px] tracking-[0.4em]">
+              Administration Centrale
+            </span>
           </div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-neutral-900 leading-tight">
+            {activeTab === "stats"
+              ? "Performances"
+              : activeTab === "products"
+              ? "Le Catalogue"
+              : activeTab === "assets"
+              ? "Design & Apparence"
+              : activeTab === "newsletter"
+              ? "Club WhatsApp"
+              : "L'Historique"}
+          </h1>
         </div>
 
-        <div className="px-10 py-6 border-b border-white/5">
-          <button 
-            onClick={onLogout} 
-            className="w-full flex items-center justify-center space-x-3 text-red-500 bg-red-500/5 hover:bg-red-500/20 py-4 transition-all font-bold label-caps !text-[10px] tracking-widest border border-red-500/10 hover:border-red-500/30"
+        <div className="flex items-center gap-5 w-full lg:w-auto">
+          <button
+            onClick={fetchData}
+            className="p-4 bg-white shadow-xl editorial-border text-neutral-400 hover:text-editorial-gold hover:scale-110 active:scale-95 transition-all"
+            title="Actualiser les données"
           >
-            <LogOut size={16} />
-            <span>Déconnexion</span>
+            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
+
+          {activeTab === "products" && (
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setIsFormOpen(true);
+              }}
+              className="flex-1 lg:flex-none bg-editorial-text text-white px-8 py-4 label-caps !text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-2xl hover:bg-neutral-800 transition-all hover:-translate-y-1 active:translate-y-0"
+            >
+              <Plus size={16} />
+              <span>Nouveau Produit</span>
+            </button>
+          )}
         </div>
+      </header>
 
-        <nav className="flex-1 p-8 space-y-3 overflow-y-auto custom-scrollbar">
-          <NavButton 
-            active={activeTab === 'stats'} 
-            onClick={() => setActiveTab('stats')} 
-            icon={<BarChart3 size={20} />} 
-            label="Vue d'ensemble" 
-          />
-          <NavButton 
-            active={activeTab === 'products'} 
-            onClick={() => setActiveTab('products')} 
-            icon={<Package size={20} />} 
-            label="Gestion Catalogue" 
-          />
-          <NavButton 
-            active={activeTab === 'orders'} 
-            onClick={() => setActiveTab('orders')} 
-            icon={<ShoppingBag size={20} />} 
-            label="Commandes" 
-          />
-          <NavButton 
-            active={activeTab === 'categories'} 
-            onClick={() => setActiveTab('categories')} 
-            icon={<Filter size={20} />} 
-            label="Rayons / Catégories" 
-          />
-          <NavButton 
-            active={activeTab === 'reviews'} 
-            onClick={() => setActiveTab('reviews')} 
-            icon={<Star size={20} />} 
-            label="Avis Clientes" 
-          />
-          <NavButton 
-            active={activeTab === 'activity'} 
-            onClick={() => setActiveTab('activity')} 
-            icon={<Clock size={20} />} 
-            label="Journal de bord" 
-          />
-          <NavButton 
-            active={activeTab === 'assets'} 
-            onClick={() => setActiveTab('assets')} 
-            icon={<Eye size={20} />} 
-            label="Design & Apparence" 
-          />
-          <NavButton 
-            active={activeTab === 'newsletter'} 
-            onClick={() => setActiveTab('newsletter')} 
-            icon={<MessageCircle size={20} />} 
-            label="Club WhatsApp" 
-          />
-        </nav>
-
-        <div className="p-10 border-t border-white/5 mt-auto">
-          <button 
-            onClick={() => window.location.href = '/'}
-            className="w-full flex items-center justify-between group px-6 py-4 border border-white/10 hover:border-editorial-gold transition-all duration-300"
-          >
-            <span className="label-caps !text-[9px] tracking-widest text-white/50 group-hover:text-white">Retour boutique</span>
-            <ArrowLeft size={14} className="text-white/30 group-hover:text-editorial-gold group-hover:-translate-x-1 transition-all" />
-          </button>
+      {loading && (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin">
+            <RefreshCw size={32} className="text-editorial-gold" />
+          </div>
         </div>
-      </aside>
+      )}
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 md:p-16 lg:p-20 overflow-y-auto bg-neutral-50/50">
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
-          <div>
-            <div className="flex items-center gap-4 mb-4">
-               <span className="w-12 h-[1px] bg-editorial-gold"></span>
-               <span className="label-caps text-editorial-gold font-bold !text-[9px] tracking-[0.4em]">Administration Centrale</span>
-            </div>
-            <h1 className="text-5xl md:text-6xl font-serif text-neutral-900 leading-tight">
-              {activeTab === 'stats' ? "Performances" : activeTab === 'products' ? "Le Catalogue" : activeTab === 'assets' ? "Design & Apparence" : activeTab === 'newsletter' ? "Club WhatsApp" : "L'Historique"}
-            </h1>
-          </div>
-          
-          <div className="flex items-center gap-5 w-full lg:w-auto">
-             <button 
-               onClick={fetchData} 
-               className="p-4 bg-white shadow-xl editorial-border text-neutral-400 hover:text-editorial-gold hover:scale-110 active:scale-95 transition-all"
-               title="Actualiser les données"
-             >
-               <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-             </button>
-             
-             {activeTab === 'products' && (
-               <button 
-                onClick={() => { setEditingProduct(null); setIsFormOpen(true); }}
-                className="flex-1 lg:flex-none bg-editorial-text text-white px-10 py-5 label-caps !text-[10px] tracking-widest flex items-center justify-center gap-4 shadow-2xl hover:bg-neutral-800 transition-all hover:-translate-y-1 active:translate-y-0"
-               >
-                 <Plus size={18} />
-                 <span>Nouveau Produit</span>
-               </button>
-             )}
-          </div>
-        </header>
-
-        {activeTab === 'stats' && stats && (
-          <StatsView 
-            stats={stats} 
-            orders={orders} 
-            reviews={reviews} 
-            assets={assets}
-            setActiveTab={setActiveTab}
-            token={token}
-            onUpdate={handleAssetUpdate}
-          />
-        )}
-        {activeTab === 'products' && (
-          <ProductsView 
-            products={filteredProducts} 
-            categories={categories}
-            searchTerm={searchTerm} 
-            statusFilter={statusFilter}
-            categoryFilter={categoryFilter}
-            setSearchTerm={setSearchTerm} 
-            setStatusFilter={setStatusFilter}
-            setCategoryFilter={setCategoryFilter}
-            onEdit={(p: Product) => { setEditingProduct(p); setIsFormOpen(true); }} 
-            onDelete={handleDelete} 
-          />
-        )}
-        {activeTab === 'orders' && (
-          <OrdersView 
-            orders={orders}
-            filter={orderFilter}
-            setFilter={setOrderFilter}
-            onStatusChange={handleOrderStatus}
-            onDelete={handleOrderDelete}
-          />
-        )}
-        {activeTab === 'categories' && (
-          <CategoriesView 
-            categories={categories}
-            onAdd={handleCategoryAdd}
-            onDelete={handleCategoryDelete}
-          />
-        )}
-        {activeTab === 'reviews' && (
-          <ReviewsView 
-            reviews={reviews}
-            filter={reviewFilter}
-            setFilter={setReviewFilter}
-            onStatusChange={handleReviewStatus}
-            onFeatureChange={handleReviewFeature}
-            onDelete={handleReviewDelete}
-          />
-        )}
-        {activeTab === 'activity' && stats && <ActivityView activity={stats.recentActivity} />}
-        {activeTab === 'assets' && (
-          <AssetsView 
-            assets={assets} 
-            token={token} 
-            onUpdate={handleAssetUpdate} 
-          />
-        )}
-        {activeTab === 'newsletter' && <NewsletterView token={token} />}
-      </main>
+      {!loading && (
+        <>
+          {activeTab === "stats" && stats && (
+            <StatsView
+              stats={stats}
+              orders={orders}
+              reviews={reviews}
+              assets={assets}
+              setActiveTab={setActiveTab}
+              token={token}
+              onUpdate={handleAssetUpdate}
+            />
+          )}
+          {activeTab === "products" && (
+            <ProductsView
+              products={filteredProducts}
+              categories={categories}
+              searchTerm={searchTerm}
+              statusFilter={statusFilter}
+              categoryFilter={categoryFilter}
+              setSearchTerm={setSearchTerm}
+              setStatusFilter={setStatusFilter}
+              setCategoryFilter={setCategoryFilter}
+              onEdit={(p: Product) => {
+                setEditingProduct(p);
+                setIsFormOpen(true);
+              }}
+              onDelete={handleDelete}
+            />
+          )}
+          {activeTab === "orders" && (
+            <OrdersView
+              orders={orders}
+              filter={orderFilter}
+              setFilter={setOrderFilter}
+              onStatusChange={handleOrderStatus}
+              onDelete={handleOrderDelete}
+            />
+          )}
+          {activeTab === "categories" && (
+            <CategoriesView
+              categories={categories}
+              onAdd={handleCategoryAdd}
+              onDelete={handleCategoryDelete}
+            />
+          )}
+          {activeTab === "reviews" && (
+            <ReviewsView
+              reviews={reviews}
+              filter={reviewFilter}
+              setFilter={setReviewFilter}
+              onStatusChange={handleReviewStatus}
+              onFeatureChange={handleReviewFeature}
+              onDelete={handleReviewDelete}
+            />
+          )}
+          {activeTab === "activity" && stats && (
+            <ActivityView activity={stats.recentActivity} />
+          )}
+          {activeTab === "assets" && (
+            <AssetsView
+              assets={assets}
+              token={token}
+              onUpdate={handleAssetUpdate}
+            />
+          )}
+          {activeTab === "newsletter" && (
+            <NewsletterView token={token} />
+          )}
+        </>
+      )}
 
       <AnimatePresence>
         {isFormOpen && (
-          <ProductForm 
-            product={editingProduct} 
-            categories={categories} 
-            token={token} 
-            onClose={() => setIsFormOpen(false)} 
-            onSubmit={fetchData} 
+          <ProductForm
+            product={editingProduct}
+            categories={categories}
+            token={token}
+            onClose={() => setIsFormOpen(false)}
+            onSubmit={fetchData}
           />
         )}
       </AnimatePresence>
-    </div>
+    </AdminLayout>
   );
 }
 
@@ -426,15 +377,15 @@ function NewsletterView({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/newsletter', {
-      headers: { 'Authorization': `Bearer ${token}` }
+    fetch("/api/admin/newsletter", {
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         setSubscribers(data);
         setLoading(false);
       })
-      .catch(err => console.error(err));
+      .catch((err) => console.error(err));
   }, [token]);
 
   return (
@@ -442,7 +393,9 @@ function NewsletterView({ token }: { token: string }) {
       <div className="flex justify-between items-end mb-12">
         <div>
           <h3 className="text-4xl font-serif mb-4 italic">Club WhatsApp</h3>
-          <p className="text-neutral-400 text-sm font-light">Liste des clientes inscrites pour recevoir les nouveautés.</p>
+          <p className="text-neutral-400 text-sm font-light">
+            Liste des clientes inscrites pour recevoir les nouveautés.
+          </p>
         </div>
         <div className="bg-editorial-gold/10 text-editorial-gold px-6 py-3 rounded-full label-caps !text-[10px]">
           {subscribers.length} Abonnées
@@ -453,72 +406,75 @@ function NewsletterView({ token }: { token: string }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-neutral-50 border-b border-neutral-100">
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">Date d'inscription</th>
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">Numéro WhatsApp</th>
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">Actions</th>
+              <th className="p-6 label-caps !text-[10px] text-neutral-400">
+                Date d'inscription
+              </th>
+              <th className="p-6 label-caps !text-[10px] text-neutral-400">
+                Numéro WhatsApp
+              </th>
+              <th className="p-6 label-caps !text-[10px] text-neutral-400">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={3} className="p-20 text-center animate-pulse text-neutral-300 font-serif italic">Chargement du club...</td></tr>
-            ) : subscribers.length === 0 ? (
-              <tr><td colSpan={3} className="p-20 text-center text-neutral-300 font-serif italic text-xl">Aucune inscription pour le moment.</td></tr>
-            ) : subscribers.map((sub) => (
-              <tr key={sub.id} className="border-b border-neutral-50 hover:bg-neutral-50/50 transition-colors">
-                <td className="p-6 text-xs text-neutral-500">
-                  {new Date(sub.created_at).toLocaleDateString('fr-FR', {
-                    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                  })}
-                </td>
-                <td className="p-6">
-                  <a 
-                    href={`https://wa.me/${sub.whatsapp.replace(/\D/g, '')}`} 
-                    target="_blank" 
-                    className="text-editorial-text font-mono font-bold hover:text-editorial-gold transition-colors flex items-center gap-2"
-                  >
-                    <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
-                      <MessageCircle size={14} className="text-[#25D366]" />
-                    </div>
-                    {sub.whatsapp}
-                  </a>
-                </td>
-                <td className="p-6">
-                  <button className="text-neutral-300 hover:text-red-500 transition-colors label-caps !text-[9px]">Supprimer</button>
+              <tr>
+                <td
+                  colSpan={3}
+                  className="p-20 text-center animate-pulse text-neutral-300 font-serif italic"
+                >
+                  Chargement du club...
                 </td>
               </tr>
-            ))}
+            ) : subscribers.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={3}
+                  className="p-20 text-center text-neutral-300 font-serif italic text-xl"
+                >
+                  Aucune inscription pour le moment.
+                </td>
+              </tr>
+            ) : (
+              subscribers.map((sub) => (
+                <tr
+                  key={sub.id}
+                  className="border-b border-neutral-50 hover:bg-neutral-50/50 transition-colors"
+                >
+                  <td className="p-6 text-xs text-neutral-500">
+                    {new Date(sub.created_at).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="p-6">
+                    <a
+                      href={`https://wa.me/${sub.whatsapp.replace(/\D/g, "")}`}
+                      target="_blank"
+                      className="text-editorial-text font-mono font-bold hover:text-editorial-gold transition-colors flex items-center gap-2"
+                    >
+                      <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+                        <MessageCircle size={14} className="text-[#25D366]" />
+                      </div>
+                      {sub.whatsapp}
+                    </a>
+                  </td>
+                  <td className="p-6">
+                    <button className="text-neutral-300 hover:text-red-500 transition-colors label-caps !text-[9px]">
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
     </div>
-  );
-}
-
-function NavButton({ active, icon, label, onClick }: any) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "w-full flex items-center space-x-5 px-8 py-5 transition-all duration-500 font-bold label-caps !text-[10px] tracking-[0.2em] relative overflow-hidden group",
-        active 
-          ? "text-editorial-gold bg-white/5 border-r-4 border-editorial-gold shadow-[inset_0_0_20px_rgba(197,162,103,0.05)]" 
-          : "text-white/40 hover:text-white hover:bg-white/5"
-      )}
-    >
-      <span className={cn(
-        "transition-transform duration-500 group-hover:scale-110",
-        active ? "text-editorial-gold" : "text-white/20"
-      )}>
-        {icon}
-      </span>
-      <span>{label}</span>
-      {active && (
-        <motion.div 
-          layoutId="activeGlow"
-          className="absolute inset-0 bg-editorial-gold/5 blur-xl pointer-events-none"
-        />
-      )}
-    </button>
   );
 }
 
