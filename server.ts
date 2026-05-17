@@ -136,126 +136,170 @@ async function startServer() {
   }
 
   app.get("/api/products", async (req, res) => {
-    const { category, search, sort, status, id } = req.query;
-    
-    // Simplification for Firestore: fetch all and filter in memory since we don't have indexes and complex queries setup
-    const productsSnap = await getDocs(collection(db, 'products'));
-    let products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    try {
+      const { category, search, sort, status, id } = req.query;
+      
+      // Simplification for Firestore: fetch all and filter in memory since we don't have indexes and complex queries setup
+      const productsSnap = await getDocs(collection(db, 'products'));
+      let products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 
-    if (id) products = products.filter(p => p.id === id);
-    if (category) products = products.filter(p => p.category_name === category);
-    if (search) {
-      const s = String(search).toLowerCase();
-      products = products.filter(p => p.name.toLowerCase().includes(s) || (p.description && p.description.toLowerCase().includes(s)));
+      if (id) products = products.filter(p => p.id === id);
+      if (category) products = products.filter(p => p.category_name === category);
+      if (search) {
+        const s = String(search).toLowerCase();
+        products = products.filter(p => p.name.toLowerCase().includes(s) || (p.description && p.description.toLowerCase().includes(s)));
+      }
+      if (status) products = products.filter(p => p.status === status);
+      else products = products.filter(p => p.status === 'active');
+
+      if (sort === "price_asc") products.sort((a, b) => a.price - b.price);
+      else if (sort === "price_desc") products.sort((a, b) => b.price - a.price);
+      else if (sort === "views") products.sort((a, b) => (b.views || 0) - (a.views || 0));
+      else products.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+      // Enrich with reviews
+      const reviewsSnap = await getDocs(collection(db, 'reviews'));
+      const reviews = reviewsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      
+      products = products.map(p => {
+        const pReviews = reviews.filter(r => r.product_id === p.id && r.status === 'approved');
+        const avg_rating = pReviews.length ? pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length : 0;
+        return { ...p, avg_rating, review_count: pReviews.length };
+      });
+
+      res.json(products);
+    } catch (error: any) {
+      logger.error("GET /api/products error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
     }
-    if (status) products = products.filter(p => p.status === status);
-    else products = products.filter(p => p.status === 'active');
-
-    if (sort === "price_asc") products.sort((a, b) => a.price - b.price);
-    else if (sort === "price_desc") products.sort((a, b) => b.price - a.price);
-    else if (sort === "views") products.sort((a, b) => (b.views || 0) - (a.views || 0));
-    else products.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-
-    // Enrich with reviews
-    const reviewsSnap = await getDocs(collection(db, 'reviews'));
-    const reviews = reviewsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    
-    products = products.map(p => {
-      const pReviews = reviews.filter(r => r.product_id === p.id && r.status === 'approved');
-      const avg_rating = pReviews.length ? pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length : 0;
-      return { ...p, avg_rating, review_count: pReviews.length };
-    });
-
-    res.json(products);
   });
 
   app.get("/api/products/:id/reviews", async (req, res) => {
-    const q = query(collection(db, 'reviews'), where("product_id", "==", req.params.id), where("status", "==", "approved"));
-    const snap = await getDocs(q);
-    const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    reviews.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    res.json(reviews);
+    try {
+      const q = query(collection(db, 'reviews'), where("product_id", "==", req.params.id), where("status", "==", "approved"));
+      const snap = await getDocs(q);
+      const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      reviews.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      res.json(reviews);
+    } catch (error: any) {
+      logger.error("GET /api/products/:id/reviews error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
+    }
   });
 
   app.post("/api/products/:id/reviews", async (req, res) => {
-    const { customer_name, rating, comment, image_url } = req.body;
-    const docRef = await addDoc(collection(db, 'reviews'), {
-      product_id: req.params.id,
-      customer_name,
-      rating: Number(rating),
-      comment,
-      image_url: image_url || null,
-      status: 'approved',
-      created_at: new Date().toISOString()
-    });
-    
-    await logActivity("New Review", `New review for product ${req.params.id} by ${customer_name}`);
-    res.json({ success: true, id: docRef.id });
+    try {
+      const { customer_name, rating, comment, image_url } = req.body;
+      const docRef = await addDoc(collection(db, 'reviews'), {
+        product_id: req.params.id,
+        customer_name,
+        rating: Number(rating),
+        comment,
+        image_url: image_url || null,
+        status: 'approved',
+        created_at: new Date().toISOString()
+      });
+      
+      await logActivity("New Review", `New review for product ${req.params.id} by ${customer_name}`);
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      logger.error("POST /api/products/:id/reviews error", { error: error.message });
+      res.status(500).json({ error: "Failed to add review" });
+    }
   });
 
   app.post("/api/newsletter", async (req, res) => {
-    const { whatsapp } = req.body;
-    if (!whatsapp) return res.status(400).json({ error: "WhatsApp number required" });
-    const q = query(collection(db, 'newsletter'), where("whatsapp", "==", whatsapp));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return res.json({ success: true, alreadyExists: true });
+    try {
+      const { whatsapp } = req.body;
+      if (!whatsapp) return res.status(400).json({ error: "WhatsApp number required" });
+      const q = query(collection(db, 'newsletter'), where("whatsapp", "==", whatsapp));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return res.json({ success: true, alreadyExists: true });
+      }
+      await addDoc(collection(db, 'newsletter'), { whatsapp, created_at: new Date().toISOString() });
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("POST /api/newsletter error", { error: error.message });
+      res.status(500).json({ error: "Failed to subscribe" });
     }
-    await addDoc(collection(db, 'newsletter'), { whatsapp, created_at: new Date().toISOString() });
-    res.json({ success: true });
-  });
-
-  app.get("/api/admin/newsletter", authenticateToken, async (req, res) => {
-    const snap = await getDocs(collection(db, 'newsletter'));
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    items.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    res.json(items);
   });
 
   app.get("/api/admin/reviews", authenticateToken, async (req, res) => {
-    const { status, rating } = req.query;
-    const snap = await getDocs(collection(db, 'reviews'));
-    let items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    
-    if (status) items = items.filter(i => i.status === status);
-    if (rating) items = items.filter(i => Number(i.rating) === Number(rating));
+    try {
+      const { status, rating } = req.query;
+      const snap = await getDocs(collection(db, 'reviews'));
+      let items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      
+      if (status) items = items.filter(i => i.status === status);
+      if (rating) items = items.filter(i => Number(i.rating) === Number(rating));
 
-    // Fetch product names
-    const pSnap = await getDocs(collection(db, 'products'));
-    const products = pSnap.docs.reduce((acc: any, d) => { acc[d.id] = d.data().name; return acc; }, {});
-    
-    items = items.map(i => ({ ...i, product_name: products[i.product_id] }));
-    items.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    res.json(items);
+      // Fetch product names
+      const pSnap = await getDocs(collection(db, 'products'));
+      const products = pSnap.docs.reduce((acc: any, d) => { acc[d.id] = d.data().name; return acc; }, {});
+      
+      items = items.map(i => ({ ...i, product_name: products[i.product_id] }));
+      items.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      res.json(items);
+    } catch (error: any) {
+      logger.error("GET /api/admin/reviews error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
+    }
   });
 
   app.patch("/api/admin/reviews/:id", authenticateToken, async (req, res) => {
-    const { status, is_featured } = req.body;
-    const updateData: any = {};
-    if (status !== undefined) updateData.status = status;
-    if (is_featured !== undefined) updateData.is_featured = is_featured ? 1 : 0;
-    
-    if (Object.keys(updateData).length > 0) {
-      await updateDoc(doc(db, 'reviews', req.params.id), updateData);
+    try {
+      const { status, is_featured } = req.body;
+      const updateData: any = {};
+      if (status !== undefined) updateData.status = status;
+      if (is_featured !== undefined) updateData.is_featured = is_featured ? 1 : 0;
+      
+      if (Object.keys(updateData).length > 0) {
+        await updateDoc(doc(db, 'reviews', req.params.id), updateData);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("PATCH /api/admin/reviews/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to update review" });
     }
-    res.json({ success: true });
   });
 
   app.delete("/api/admin/reviews/:id", authenticateToken, async (req, res) => {
-    await deleteDoc(doc(db, 'reviews', req.params.id));
-    res.json({ success: true });
+    try {
+      await deleteDoc(doc(db, 'reviews', req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("DELETE /api/admin/reviews/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to delete review" });
+    }
   });
 
-  app.get("/api/site-assets", async (req, res) => {
-    const snap = await getDocs(collection(db, 'site_assets'));
-    res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  app.get("/api/admin/assets", authenticateToken, async (req, res) => {
+    try {
+      const snap = await getDocs(collection(db, 'site_assets'));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      res.json(items);
+    } catch (error: any) {
+      logger.error("GET /api/admin/assets error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
+    }
   });
 
   app.patch("/api/admin/assets/:id", authenticateToken, async (req, res) => {
-    const { url, content } = req.body;
-    const updateData: any = {};
-    if (url !== undefined) updateData.url = url;
-    if (content !== undefined) updateData.content = content;
+    try {
+      const { url, content } = req.body;
+      const updateData: any = {};
+      if (url !== undefined) updateData.url = url;
+      if (content !== undefined) updateData.content = content;
+      
+      if (Object.keys(updateData).length > 0) {
+        await updateDoc(doc(db, 'site_assets', req.params.id), updateData);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("PATCH /api/admin/assets/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to update asset" });
+    }pdateData.content = content;
     
     if (Object.keys(updateData).length > 0) {
       await updateDoc(doc(db, 'site_assets', req.params.id), updateData);
@@ -293,118 +337,210 @@ async function startServer() {
   });
 
   app.get("/api/admin/orders", authenticateToken, async (req, res) => {
-    const snap = await getDocs(collection(db, 'orders'));
-    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    orders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    
-    const itemsSnap = await getDocs(collection(db, 'order_items'));
-    const allItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-    
-    for (let order of orders) {
-      order.items = allItems.filter(i => i.order_id === order.id);
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      const orders = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      orders.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      
+      const itemsSnap = await getDocs(collection(db, 'order_items'));
+      const allItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      
+      for (let order of orders) {
+        order.items = allItems.filter(i => i.order_id === order.id);
+      }
+      res.json(orders);
+    } catch (error: any) {
+      logger.error("GET /api/admin/orders error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
     }
-    res.json(orders);
   });
 
   app.patch("/api/admin/orders/:id", authenticateToken, async (req, res) => {
-    await updateDoc(doc(db, 'orders', req.params.id), { status: req.body.status });
-    res.json({ success: true });
+    try {
+      await updateDoc(doc(db, 'orders', req.params.id), { status: req.body.status });
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("PATCH /api/admin/orders/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to update order" });
+    }
   });
 
   app.post("/api/admin/products", authenticateToken, async (req, res) => {
-    const p = req.body;
-    // Get category name
-    let catName = "";
-    if (p.category_id) {
-      const cDoc = await getDoc(doc(db, 'categories', String(p.category_id)));
-      if (cDoc.exists()) catName = cDoc.data().name;
-    }
+    try {
+      const p = req.body;
+      // Get category name
+      let catName = "";
+      if (p.category_id) {
+        const cDoc = await getDoc(doc(db, 'categories', String(p.category_id)));
+        if (cDoc.exists()) catName = cDoc.data().name;
+      }
 
-    const docRef = await addDoc(collection(db, 'products'), {
-      name: p.name,
-      price: Number(p.price),
-      old_price: p.old_price ? Number(p.old_price) : null,
-      description: p.description || "",
-      long_description: p.long_description || "",
-      category_id: p.category_id || "",
-      category_name: catName,
-      sub_category: p.sub_category || "",
-      image_url: p.image_url || "",
-      gallery_urls: p.gallery_urls || "[]",
-      colors: p.colors || "[]",
-      sizes: p.sizes || "[]",
-      stock: Number(p.stock || 0),
-      badge: p.badge || "",
-      highlights: p.highlights || "[]",
-      status: p.status || "active",
-      views: 0,
-      whatsapp_clicks: 0,
-      created_at: new Date().toISOString()
-    });
-    res.json({ success: true, id: docRef.id });
+      const docRef = await addDoc(collection(db, 'products'), {
+        name: p.name,
+        price: Number(p.price),
+        old_price: p.old_price ? Number(p.old_price) : null,
+        description: p.description || "",
+        long_description: p.long_description || "",
+        category_id: p.category_id || "",
+        category_name: catName,
+        sub_category: p.sub_category || "",
+        image_url: p.image_url || "",
+        gallery_urls: p.gallery_urls || "[]",
+        colors: p.colors || "[]",
+        sizes: p.sizes || "[]",
+        stock: Number(p.stock || 0),
+        badge: p.badge || "",
+        highlights: p.highlights || "[]",
+        status: p.status || "active",
+        views: 0,
+        whatsapp_clicks: 0,
+        created_at: new Date().toISOString()
+      });
+      await logActivity("Product Created", `New product: ${p.name}`);
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      logger.error("POST /api/admin/products error", { error: error.message });
+      res.status(500).json({ error: "Failed to create product" });
+    }
   });
 
   app.put("/api/admin/products/:id", authenticateToken, async (req, res) => {
-    const p = req.body;
-    let catName = "";
-    if (p.category_id) {
-      const cDoc = await getDoc(doc(db, 'categories', String(p.category_id)));
-      if (cDoc.exists()) catName = cDoc.data().name;
-      else {
-          // If category_id is not a document ID but the category was added differently
-          const catsSnap = await getDocs(collection(db, 'categories'));
-          const found = catsSnap.docs.find(d => d.id === p.category_id || d.data().name === p.category_id);
-          if (found) catName = found.data().name;
+    try {
+      const p = req.body;
+      let catName = "";
+      if (p.category_id) {
+        const cDoc = await getDoc(doc(db, 'categories', String(p.category_id)));
+        if (cDoc.exists()) catName = cDoc.data().name;
+        else {
+            // If category_id is not a document ID but the category was added differently
+            const catsSnap = await getDocs(collection(db, 'categories'));
+            const found = catsSnap.docs.find(d => d.id === p.category_id || d.data().name === p.category_id);
+            if (found) catName = found.data().name;
+        }
       }
+      
+      await updateDoc(doc(db, 'products', req.params.id), {
+        name: p.name,
+        price: Number(p.price),
+        old_price: p.old_price ? Number(p.old_price) : null,
+        description: p.description,
+        long_description: p.long_description,
+        category_id: p.category_id,
+        category_name: catName || p.category_name || "",
+        sub_category: p.sub_category,
+        image_url: p.image_url,
+        gallery_urls: p.gallery_urls,
+        colors: p.colors,
+        sizes: p.sizes,
+        stock: Number(p.stock),
+        badge: p.badge,
+        highlights: p.highlights,
+        status: p.status
+      });
+      await logActivity("Product Updated", `Product updated: ${p.name}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("PUT /api/admin/products/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to update product" });
     }
-    
-    await updateDoc(doc(db, 'products', req.params.id), {
-      name: p.name,
-      price: Number(p.price),
-      old_price: p.old_price ? Number(p.old_price) : null,
-      description: p.description,
-      long_description: p.long_description,
-      category_id: p.category_id,
-      category_name: catName || p.category_name || "",
-      sub_category: p.sub_category,
-      image_url: p.image_url,
-      gallery_urls: p.gallery_urls,
-      colors: p.colors,
-      sizes: p.sizes,
-      stock: Number(p.stock),
-      badge: p.badge,
-      highlights: p.highlights,
-      status: p.status
-    });
-    res.json({ success: true });
   });
 
   app.delete("/api/admin/products/:id", authenticateToken, async (req, res) => {
-    await deleteDoc(doc(db, 'products', req.params.id));
-    res.json({ success: true });
+    try {
+      await deleteDoc(doc(db, 'products', req.params.id));
+      await logActivity("Product Deleted", `Product deleted: ${req.params.id}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("DELETE /api/admin/products/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to delete product" });
+    }
   });
 
   app.get("/api/categories", async (req, res) => {
-    const snap = await getDocs(collection(db, 'categories'));
-    res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    try {
+      const snap = await getDocs(collection(db, 'categories'));
+      res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (error: any) {
+      logger.error("GET /api/categories error", { error: error.message });
+      res.json([]); // Return empty array if DB fails
+    }
   });
 
   app.get("/api/admin/stats", authenticateToken, async (req, res) => {
-    const visitors = await getDocs(collection(db, 'visitors'));
-    const orders = await getDocs(collection(db, 'orders'));
-    const products = await getDocs(collection(db, 'products'));
-    const activitySnap = await getDocs(query(collection(db, 'activity_log'), limit(10)));
-    
-    const clicks = products.docs.reduce((sum, d) => sum + (Number(d.data().whatsapp_clicks) || 0), 0);
-    const activity = activitySnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    activity.sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
-    
-    res.json({
-      totalVisitors: visitors.size,
-      totalOrders: orders.size,
-      totalWhatsAppClicks: clicks,
-      recentActivity: activity
-    });
+    try {
+      const visitors = await getDocs(collection(db, 'visitors'));
+      const orders = await getDocs(collection(db, 'orders'));
+      const products = await getDocs(collection(db, 'products'));
+      const activitySnap = await getDocs(query(collection(db, 'activity_log'), limit(10)));
+      
+      const clicks = products.docs.reduce((sum, d) => sum + (Number(d.data().whatsapp_clicks) || 0), 0);
+      const activity = activitySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      activity.sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      
+      // Count low stock products
+      const lowStockCount = products.docs.filter((d) => Number(d.data().stock || 0) <= 5).length;
+      
+      // Get most viewed products
+      const mostViewed = products.docs
+        .map((d) => ({ id: d.id, name: d.data().name, views: Number(d.data().views || 0) }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 5);
+      
+      res.json({
+        totalVisitors: visitors.size,
+        totalOrders: orders.size,
+        totalWhatsAppClicks: clicks,
+        lowStockCount,
+        mostViewed,
+        recentActivity: activity
+      });
+    } catch (error: any) {
+      logger.error("GET /api/admin/stats error", { error: error.message });
+      res.json({
+        totalVisitors: 0,
+        totalOrders: 0,
+        totalWhatsAppClicks: 0,
+        lowStockCount: 0,
+        mostViewed: [],
+        recentActivity: []
+      });
+    }
+  });
+
+  app.post("/api/admin/categories", authenticateToken, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: "Category name required" });
+      const docRef = await addDoc(collection(db, 'categories'), { name });
+      await logActivity("Category Created", `New category: ${name}`);
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      logger.error("POST /api/admin/categories error", { error: error.message });
+      res.status(500).json({ error: "Failed to create category" });
+    }
+  });
+
+  app.delete("/api/admin/categories/:id", authenticateToken, async (req, res) => {
+    try {
+      await deleteDoc(doc(db, 'categories', req.params.id));
+      await logActivity("Category Deleted", `Category deleted: ${req.params.id}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("DELETE /api/admin/categories/:id error", { error: error.message });
+      res.status(500).json({ error: "Failed to delete category" });
+    }
+  });
+
+  app.get("/api/admin/newsletter", authenticateToken, async (req, res) => {
+    try {
+      const snap = await getDocs(collection(db, 'newsletter'));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      items.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      res.json(items);
+    } catch (error: any) {
+      logger.error("GET /api/admin/newsletter error", { error: error.message });
+      res.json([]);
+    }
   });
 
   app.post("/api/admin/login", async (req, res) => {
@@ -434,9 +570,14 @@ async function startServer() {
   });
 
   app.post("/api/track-visitor", async (req, res) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    await addDoc(collection(db, 'visitors'), { ip_address: String(ip), timestamp: new Date().toISOString() });
-    res.json({ success: true });
+    try {
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      await addDoc(collection(db, 'visitors'), { ip_address: String(ip), timestamp: new Date().toISOString() });
+      res.json({ success: true });
+    } catch (error: any) {
+      logger.error("POST /api/track-visitor error", { error: error.message });
+      res.json({ success: true }); // Don't block if tracking fails
+    }
   });
 
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

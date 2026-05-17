@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useRef } from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/Navbar.tsx";
 import Footer from "./components/layout/Footer.tsx";
 import Hero from "./components/home/Hero.tsx";
@@ -303,21 +303,30 @@ function App() {
   return (
     <Router>
       <CartProvider>
-        <div className="relative">
-          <Navbar />
-          <CartDrawer />
-          <CartFAB />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/shop" element={<ShopPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/product/:id" element={<ProductDetails />} />
-          </Routes>
-          <Footer />
-        </div>
+        <AppContent />
       </CartProvider>
     </Router>
+  );
+}
+
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  return (
+    <div className="relative">
+      {!isAdminRoute && <Navbar />}
+      {!isAdminRoute && <CartDrawer />}
+      {!isAdminRoute && <CartFAB />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/shop" element={<ShopPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/product/:id" element={<ProductDetails />} />
+      </Routes>
+      {!isAdminRoute && <Footer />}
+    </div>
   );
 }
 

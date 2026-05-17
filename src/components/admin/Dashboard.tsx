@@ -28,6 +28,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,18 +39,32 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
 
   const fetchData = async () => {
     try {
+      setError("");
       setLoading(true);
-      const [statsRes, prodRes, catRes, reviewRes, orderRes, assetRes] = await Promise.all([
-        fetch("/api/admin/stats", { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch("/api/products?status=all", { headers: { "Authorization": `Bearer ${token}` } }),
+
+      const [
+        statsRes,
+        prodRes,
+        catRes,
+        reviewRes,
+        orderRes,
+        assetRes,
+      ] = await Promise.all([
+        fetch("/api/admin/stats", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/products?status=all", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/categories"),
-        fetch("/api/admin/reviews", { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch("/api/admin/orders", { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch("/api/admin/assets", { headers: { "Authorization": `Bearer ${token}` } })
+        fetch("/api/admin/reviews", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/admin/orders", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/admin/assets", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (statsRes.status === 401) {
         onLogout();
+        return;
+      }
+
+      if (!statsRes.ok || !prodRes.ok || !catRes.ok || !reviewRes.ok || !orderRes.ok || !assetRes.ok) {
+        setError("Impossible de charger les performances. Vérifiez l’accès admin et la connexion réseau.");
         return;
       }
 
@@ -68,6 +83,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       setAssets(assetData);
     } catch (err) {
       console.error(err);
+      setError("Erreur réseau : impossible de charger les données admin.");
     } finally {
       setLoading(false);
     }
@@ -229,133 +245,169 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   return (
     <AdminLayout
       activeTab={activeTab}
-      setActiveTab={setActiveTab}
+      setActiveTab={(tab) => setActiveTab(tab as Tab)}
       onLogout={onLogout}
     >
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-12 gap-6">
-        <div>
-          <div className="flex items-center gap-4 mb-4">
-            <span className="w-12 h-[1px] bg-editorial-gold"></span>
-            <span className="label-caps text-editorial-gold font-bold !text-[9px] tracking-[0.4em]">
-              Administration Centrale
-            </span>
-          </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-neutral-900 leading-tight">
-            {activeTab === "stats"
-              ? "Performances"
-              : activeTab === "products"
-              ? "Le Catalogue"
-              : activeTab === "assets"
-              ? "Design & Apparence"
-              : activeTab === "newsletter"
-              ? "Club WhatsApp"
-              : "L'Historique"}
-          </h1>
+      <div className="w-full min-h-screen pt-4 md:pt-16 px-3 md:px-12 lg:px-16 pb-8 bg-zinc-950 text-white overflow-y-auto">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-12 gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-[1px] bg-amber-600"></span>
+                <span className="text-[8px] md:text-[9px] text-amber-400 font-bold tracking-[0.3em]">ADMIN</span>
+              </div>
+              <h1 className="text-xl md:text-3xl lg:text-4xl font-serif italic font-bold text-white leading-tight break-words">
+                {activeTab === "stats"
+                  ? "Performances"
+                  : activeTab === "products"
+                  ? "Catalogue"
+                  : activeTab === "orders"
+                  ? "Commandes"
+                  : activeTab === "categories"
+                  ? "Rayons"
+                  : activeTab === "reviews"
+                  ? "Avis"
+                  : activeTab === "activity"
+                  ? "Journal"
+                  : activeTab === "assets"
+                  ? "Design"
+                  : "Club WhatsApp"}
+              </h1>
+            </div>
+
+            {/* Actions - Mobile friendly */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <button
+                onClick={fetchData}
+                className="p-2.5 md:p-3 hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Actualiser"
+              >
+                <RefreshCw size={18} className={loading ? "animate-spin text-amber-400" : "text-zinc-400"} />
+              </button>
+
+              {activeTab === "products" && (
+                <button
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setIsFormOpen(true);
+                  }}
+                  className="flex-1 md:flex-none bg-amber-600 hover:bg-amber-700 text-white px-3 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] tracking-widest flex items-center justify-center gap-1 md:gap-2 transition-all rounded"
+                >
+                  <Plus size={14} />
+                  <span className="hidden sm:inline">Nouveau</span>
+                </button>
+              )}
+            </div>
+          </header>
+
+          {/* Loading State - Better Spinner */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-16 md:py-24">
+              <div className="relative w-12 h-12 md:w-16 md:h-16">
+                <RefreshCw size={48} className="text-amber-400 animate-spin" />
+              </div>
+              <p className="text-zinc-400 text-xs md:text-sm mt-4 font-sans">Chargement des données...</p>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="mt-10 bg-zinc-800 border border-red-500/30 rounded p-6">
+              <h3 className="text-lg md:text-xl font-serif italic text-red-400 mb-2">Chargement impossible</h3>
+              <p className="text-zinc-400 text-xs md:text-sm mb-4">{error}</p>
+              <button
+                onClick={fetchData}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 text-[9px] tracking-widest transition-all"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {activeTab === "stats" && stats ? (
+                <StatsView
+                  stats={stats}
+                  orders={orders}
+                  reviews={reviews}
+                  assets={assets}
+                  setActiveTab={setActiveTab}
+                  token={token}
+                  onUpdate={handleAssetUpdate}
+                />
+              ) : activeTab === "stats" ? (
+                <div className="mt-10 bg-zinc-800 border border-zinc-700 rounded p-6">
+                  <p className="text-zinc-400 text-sm italic">Aucune performance disponible pour le moment.</p>
+                </div>
+              ) : null}
+              
+              {activeTab === "products" && (
+                <ProductsView
+                  products={filteredProducts}
+                  categories={categories}
+                  searchTerm={searchTerm}
+                  statusFilter={statusFilter}
+                  categoryFilter={categoryFilter}
+                  setSearchTerm={setSearchTerm}
+                  setStatusFilter={setStatusFilter}
+                  setCategoryFilter={setCategoryFilter}
+                  onEdit={(p: Product) => {
+                    setEditingProduct(p);
+                    setIsFormOpen(true);
+                  }}
+                  onDelete={handleDelete}
+                />
+              )}
+              
+              {activeTab === "orders" && (
+                <OrdersView
+                  orders={orders}
+                  filter={orderFilter}
+                  setFilter={setOrderFilter}
+                  onStatusChange={handleOrderStatus}
+                  onDelete={handleOrderDelete}
+                />
+              )}
+              
+              {activeTab === "categories" && (
+                <CategoriesView
+                  categories={categories}
+                  onAdd={handleCategoryAdd}
+                  onDelete={handleCategoryDelete}
+                />
+              )}
+              
+              {activeTab === "reviews" && (
+                <ReviewsView
+                  reviews={reviews}
+                  filter={reviewFilter}
+                  setFilter={setReviewFilter}
+                  onStatusChange={handleReviewStatus}
+                  onFeatureChange={handleReviewFeature}
+                  onDelete={handleReviewDelete}
+                />
+              )}
+              
+              {activeTab === "activity" && stats && (
+                <ActivityView activity={stats.recentActivity} />
+              )}
+              
+              {activeTab === "assets" && (
+                <AssetsView
+                  assets={assets}
+                  token={token}
+                  onUpdate={handleAssetUpdate}
+                />
+              )}
+              
+              {activeTab === "newsletter" && (
+                <NewsletterView token={token} />
+              )}
+            </>
+          )}
         </div>
-
-        <div className="flex items-center gap-5 w-full lg:w-auto">
-          <button
-            onClick={fetchData}
-            className="p-4 bg-white shadow-xl editorial-border text-neutral-400 hover:text-editorial-gold hover:scale-110 active:scale-95 transition-all"
-            title="Actualiser les données"
-          >
-            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-          </button>
-
-          {activeTab === "products" && (
-            <button
-              onClick={() => {
-                setEditingProduct(null);
-                setIsFormOpen(true);
-              }}
-              className="flex-1 lg:flex-none bg-editorial-text text-white px-8 py-4 label-caps !text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-2xl hover:bg-neutral-800 transition-all hover:-translate-y-1 active:translate-y-0"
-            >
-              <Plus size={16} />
-              <span>Nouveau Produit</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin">
-            <RefreshCw size={32} className="text-editorial-gold" />
-          </div>
-        </div>
-      )}
-
-      {!loading && (
-        <>
-          {activeTab === "stats" && stats && (
-            <StatsView
-              stats={stats}
-              orders={orders}
-              reviews={reviews}
-              assets={assets}
-              setActiveTab={setActiveTab}
-              token={token}
-              onUpdate={handleAssetUpdate}
-            />
-          )}
-          {activeTab === "products" && (
-            <ProductsView
-              products={filteredProducts}
-              categories={categories}
-              searchTerm={searchTerm}
-              statusFilter={statusFilter}
-              categoryFilter={categoryFilter}
-              setSearchTerm={setSearchTerm}
-              setStatusFilter={setStatusFilter}
-              setCategoryFilter={setCategoryFilter}
-              onEdit={(p: Product) => {
-                setEditingProduct(p);
-                setIsFormOpen(true);
-              }}
-              onDelete={handleDelete}
-            />
-          )}
-          {activeTab === "orders" && (
-            <OrdersView
-              orders={orders}
-              filter={orderFilter}
-              setFilter={setOrderFilter}
-              onStatusChange={handleOrderStatus}
-              onDelete={handleOrderDelete}
-            />
-          )}
-          {activeTab === "categories" && (
-            <CategoriesView
-              categories={categories}
-              onAdd={handleCategoryAdd}
-              onDelete={handleCategoryDelete}
-            />
-          )}
-          {activeTab === "reviews" && (
-            <ReviewsView
-              reviews={reviews}
-              filter={reviewFilter}
-              setFilter={setReviewFilter}
-              onStatusChange={handleReviewStatus}
-              onFeatureChange={handleReviewFeature}
-              onDelete={handleReviewDelete}
-            />
-          )}
-          {activeTab === "activity" && stats && (
-            <ActivityView activity={stats.recentActivity} />
-          )}
-          {activeTab === "assets" && (
-            <AssetsView
-              assets={assets}
-              token={token}
-              onUpdate={handleAssetUpdate}
-            />
-          )}
-          {activeTab === "newsletter" && (
-            <NewsletterView token={token} />
-          )}
-        </>
-      )}
+      </div>
 
       <AnimatePresence>
         {isFormOpen && (

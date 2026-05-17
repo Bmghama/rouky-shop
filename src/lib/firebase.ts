@@ -2,9 +2,9 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit } from "firebase/firestore";
 
 const getBrowserEnv = () => {
-  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
-    return import.meta.env;
-  }
+  // Fix TS: `import.meta.env` peut ne pas être reconnu selon la config TS.
+  const meta = import.meta as { env?: Record<string, string> };
+  if (typeof meta !== "undefined" && meta.env) return meta.env;
   return {} as Record<string, string>;
 };
 
@@ -31,14 +31,7 @@ const firebaseConfig = {
   measurementId: getEnvVar('FIREBASE_MEASUREMENT_ID', 'VITE_FIREBASE_MEASUREMENT_ID', "G-4DVVN2K6R9")
 };
 
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-  console.log("Firebase initialized successfully with Project ID:", firebaseConfig.projectId);
-} catch (error) {
-  console.error("Firebase initialization error. Please check your environment variables:", firebaseConfig);
-  console.error(error);
-}
+const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit };
