@@ -46,6 +46,11 @@ const upload = multer({
 
 const JWT_SECRET = process.env.JWT_SECRET || "rouky-shop-secret-key-premium";
 
+if (!process.env.JWT_SECRET) {
+  console.warn("⚠️  JWT_SECRET not set in environment variables. Using fallback key. This is insecure in production!");
+}
+
+
 async function seedData() {
   const assetsSnap = await getDocs(collection(db, 'site_assets'));
   if (assetsSnap.empty) {
@@ -136,6 +141,7 @@ async function startServer() {
   function authenticateToken(req: any, res: any, next: any) {
     const authHeader = typeof req.headers['authorization'] === 'string' ? req.headers['authorization'] : undefined;
     let token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader || "";
+    let tokenSource = "Authorization header";
 
     if (token === "undefined" || token === "null") {
       token = "";
@@ -143,6 +149,7 @@ async function startServer() {
 
     if (!token && typeof req.headers['x-admin-token'] === 'string') {
       token = req.headers['x-admin-token'];
+      tokenSource = "x-admin-token header";
     }
 
     if (!token && typeof req.headers.cookie === 'string') {
@@ -152,39 +159,59 @@ async function startServer() {
         .find((part: string) => part.startsWith('admin_token='));
       if (cookie) {
         token = cookie.split('=')[1] || "";
+        tokenSource = "admin_token cookie";
       }
     }
 
     const fallbackToken = process.env.ADMIN_DEV_TOKEN || process.env.ADMIN_TEST_TOKEN;
     if (!token && fallbackToken && req.headers['x-admin-bypass'] === fallbackToken) {
+      logger.info("[AUTH] Dev bypass activated", { route: req.originalUrl });
       req.user = { username: 'dev-admin', bypass: true };
       return next();
     }
 
-    if (!token) return res.sendStatus(401);
+    if (!token) {
+      logger.warn("[AUTH] No token found in request", { route: req.originalUrl, headers: Object.keys(req.headers) });
+      return res.sendStatus(401);
+    }
+
+    logger.info("[AUTH] Token found", { 
+      route: req.originalUrl, 
+      source: tokenSource, 
+      tokenPreview: token.substring(0, 20) + "...",
+      tokenLength: token.length
+    });
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
       if (err) {
+        logger.error("[AUTH] JWT verification failed", { 
+          route: req.originalUrl,
+          error: err.message,
+          tokenPreview: token.substring(0, 20) + "...",
+          secretKeyUsed: JWT_SECRET === process.env.JWT_SECRET ? "from env" : "fallback"
+        });
         if (fallbackToken && token === fallbackToken) {
+          logger.info("[AUTH] Fallback token matched", { route: req.originalUrl });
           req.user = { username: 'dev-admin', bypass: true };
           return next();
         }
         return res.sendStatus(403);
       }
+      logger.info("[AUTH] JWT verified successfully", { route: req.originalUrl, username: user.username });
       req.user = user;
       next();
     });
   }
 
-  function timedRoute(name: string, handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<any>) {
-    return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  function timedRoute(name: string, handler: (req: express.Request, res: express.Response, next?: express.NextFunction) => Promise<void | any>) {
+    return async (req: express.Request, res: express.Response, next?: express.NextFunction) => {
       const label = `${name} - ${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
       console.time(label);
       const start = Date.now();
       try {
         await handler(req, res, next);
       } catch (error) {
-        next(error);
+        if (next) next(error);
       } finally {
         console.timeEnd(label);
         const duration = Date.now() - start;
@@ -599,17 +626,21 @@ async function startServer() {
   app.post("/api/admin/login", timedRoute("Admin Login", async (req, res) => {
     try {
       const { username, password } = req.body;
+      logger.info("[LOGIN] Attempt", { username });
+      
       const snap = await getDocs(query(collection(db, 'admins'), where("username", "==", username)));
       if (!snap.empty) {
         const admin = snap.docs[0].data();
         if (await bcrypt.compare(password, admin.password)) {
           const token = jwt.sign({ id: snap.docs[0].id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
+          logger.info("[LOGIN] Success", { username, tokenLength: token.length });
           return res.json({ token });
         }
       }
+      logger.warn("[LOGIN] Failed", { username, reason: "Invalid credentials" });
       res.status(401).json({ error: "Invalid credentials" });
     } catch (error: any) {
-      console.error("Erreur détaillée lors de la connexion Firebase (/api/admin/login):", error);
+      logger.error("Erreur détaillée lors de la connexion Firebase (/api/admin/login):", { error: error.message });
       res.status(500).json({ error: "Erreur de connexion Firestore", details: error.message });
     }
   }));
