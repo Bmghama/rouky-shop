@@ -49,7 +49,7 @@ export default function AdminLayout({
         <h1 className="text-xs font-serif italic font-bold truncate flex-1 pr-2">Rouky Admin</h1>
         <button
           onClick={() => setSidebarOpen((v) => !v)}
-          className="min-w-11 min-h-11 p-2.5 hover:bg-zinc-800 rounded-lg transition-colors flex items-center justify-center flex-shrink-0"
+          className="min-w-11 min-h-11 p-2.5 hover:bg-zinc-800 rounded-lg transition-colors flex items-center justify-center shrink-0"
           title="Menu"
           aria-label="Ouvrir le menu"
         >
@@ -184,7 +184,7 @@ function NavButton({ active, icon, label, onClick, mobile = false }: any) {
           : "text-zinc-400 hover:text-white hover:bg-zinc-800/30"
       )}
     >
-      <span className={cn("flex-shrink-0", active ? "text-amber-400" : "text-zinc-600")}>
+      <span className={cn("shrink-0", active ? "text-amber-400" : "text-zinc-600")}>
         {icon}
       </span>
       <span className="truncate text-left flex-1">{label}</span>

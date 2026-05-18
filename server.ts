@@ -299,12 +299,7 @@ async function startServer() {
     } catch (error: any) {
       logger.error("PATCH /api/admin/assets/:id error", { error: error.message });
       res.status(500).json({ error: "Failed to update asset" });
-    }pdateData.content = content;
-    
-    if (Object.keys(updateData).length > 0) {
-      await updateDoc(doc(db, 'site_assets', req.params.id), updateData);
     }
-    res.json({ success: true });
   });
 
   app.post("/api/orders", async (req, res) => {

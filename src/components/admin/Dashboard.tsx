@@ -1,12 +1,23 @@
-import { useState, useEffect } from "react";
-import { Stats, Product, Category } from "../../types.ts";
+import { useState, useEffect, useCallback } from "react";
+
+import { Stats, Product, Category, Review } from "../../types.ts";
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  Users, ShoppingBag, BarChart3, Clock, 
-  TrendingUp, Package, Activity,
-  Plus, Edit, Trash2, Search, Filter,
-  AlertTriangle, Eye, MessageCircle, RefreshCw,
-  Check, X as XIcon, Star, MapPin
+import {
+  Users,
+  ShoppingBag,
+  TrendingUp,
+  Activity,
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  AlertTriangle,
+  MessageCircle,
+  RefreshCw,
+  Check,
+  X as XIcon,
+  Star,
+  MapPin,
 } from "lucide-react";
 import { formatPrice, cn } from "../../lib/utils.ts";
 import AdminLayout from "./AdminLayout.tsx";
@@ -17,16 +28,57 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type Tab = 'stats' | 'products' | 'orders' | 'categories' | 'reviews' | 'activity' | 'assets' | 'newsletter';
+type Tab =
+  | "stats"
+  | "products"
+  | "orders"
+  | "categories"
+  | "reviews"
+  | "activity"
+  | "assets"
+  | "newsletter";
+
+interface AdminOrderItem {
+  product_name: string;
+  quantity: number;
+  color?: string;
+  size?: string;
+}
+
+interface AdminOrder {
+  id: number | string;
+  customer_name: string;
+  customer_phone: string;
+  neighborhood: string;
+  total_price: number;
+  status: string;
+  created_at: string;
+  items: AdminOrderItem[];
+}
+
+interface AdminAsset {
+  id: number | string;
+  key: string;
+  label: string;
+  category: string;
+  url: string;
+  content?: string;
+}
+
+interface NewsletterSubscriber {
+  id: number | string;
+  created_at: string;
+  whatsapp: string;
+}
 
 export default function Dashboard({ token, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('stats');
+  const [activeTab, setActiveTab] = useState<Tab>("stats");
   const [stats, setStats] = useState<Stats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [assets, setAssets] = useState<AdminAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,43 +89,65 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   const [reviewFilter, setReviewFilter] = useState("all");
   const [orderFilter, setOrderFilter] = useState("all");
 
-  const fetchData = async () => {
+  const fetchWithTimeout = useCallback(async (url: string, opts: RequestInit = {}, timeout = 5000) => {
+    const controller = new AbortController();
+    const id = window.setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, { ...opts, signal: controller.signal });
+    } catch {
+      return null;
+    } finally {
+      window.clearTimeout(id);
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    const mockStats: Stats = {
+      totalVisitors: 0,
+      totalOrders: 0,
+      totalWhatsAppClicks: 0,
+      lowStockCount: 0,
+      mostViewed: [],
+      recentActivity: [],
+      categoriesStats: [],
+    };
+
     try {
       setError("");
       setLoading(true);
 
-      const [
-        statsRes,
-        prodRes,
-        catRes,
-        reviewRes,
-        orderRes,
-        assetRes,
-      ] = await Promise.all([
-        fetch("/api/admin/stats", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/products?status=all", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/categories"),
-        fetch("/api/admin/reviews", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/admin/orders", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/admin/assets", { headers: { Authorization: `Bearer ${token}` } }),
+      const headers = { Authorization: `Bearer ${token}` };
+      const [statsRes, prodRes, catRes, reviewRes, orderRes, assetRes] = await Promise.all([
+        fetchWithTimeout("/api/admin/stats", { headers }),
+        fetchWithTimeout("/api/products?status=all", { headers }),
+        fetchWithTimeout("/api/categories"),
+        fetchWithTimeout("/api/admin/reviews", { headers }),
+        fetchWithTimeout("/api/admin/orders", { headers }),
+        fetchWithTimeout("/api/admin/assets", { headers }),
       ]);
 
-      if (statsRes.status === 401) {
+      if (statsRes?.status === 401) {
         onLogout();
         return;
       }
 
-      if (!statsRes.ok || !prodRes.ok || !catRes.ok || !reviewRes.ok || !orderRes.ok || !assetRes.ok) {
-        setError("Impossible de charger les performances. Vérifiez l’accès admin et la connexion réseau.");
-        return;
-      }
+      const safeJson = async <T,>(response: Response | null, fallback: T): Promise<T> => {
+        if (!response || !response.ok) return fallback;
+        try {
+          return (await response.json()) as T;
+        } catch {
+          return fallback;
+        }
+      };
 
-      const statsData = await statsRes.json();
-      const prodData = await prodRes.json();
-      const catData = await catRes.json();
-      const reviewData = await reviewRes.json();
-      const orderData = await orderRes.json();
-      const assetData = await assetRes.json();
+      const [statsData, prodData, catData, reviewData, orderData, assetData] = await Promise.all([
+        safeJson<Stats>(statsRes, mockStats),
+        safeJson<Product[]>(prodRes, []),
+        safeJson<Category[]>(catRes, []),
+        safeJson<Review[]>(reviewRes, []),
+        safeJson<AdminOrder[]>(orderRes, []),
+        safeJson<AdminAsset[]>(assetRes, []),
+      ]);
 
       setStats(statsData);
       setProducts(prodData);
@@ -84,12 +158,18 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     } catch (err) {
       console.error(err);
       setError("Erreur réseau : impossible de charger les données admin.");
+      setStats(mockStats);
+      setProducts([]);
+      setCategories([]);
+      setReviews([]);
+      setOrders([]);
+      setAssets([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchWithTimeout, onLogout, token]);
 
-  const handleReviewStatus = async (id: number, status: string) => {
+  const handleReviewStatus = async (id: number | string, status: string) => {
     try {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "PATCH",
@@ -105,7 +185,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const handleReviewFeature = async (id: number, is_featured: number) => {
+  const handleReviewFeature = async (id: number | string, is_featured: number) => {
     try {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "PATCH",
@@ -121,7 +201,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const handleReviewDelete = async (id: number) => {
+  const handleReviewDelete = async (id: number | string) => {
     if (confirm("Supprimer cet avis ?")) {
       try {
         const res = await fetch(`/api/admin/reviews/${id}`, {
@@ -136,10 +216,11 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    void fetchData();
+  }, [fetchData]);
 
-  const handleDelete = async (id: number) => {
+
+  const handleDelete = async (id: number | string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
       try {
         const res = await fetch(`/api/admin/products/${id}`, {
@@ -153,7 +234,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const handleOrderStatus = async (id: number, status: string) => {
+  const handleOrderStatus = async (id: number | string, status: string) => {
     try {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
@@ -169,7 +250,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const handleOrderDelete = async (id: number) => {
+  const handleOrderDelete = async (id: number | string) => {
     if (confirm("Supprimer cette commande ?")) {
       try {
         const res = await fetch(`/api/admin/orders/${id}`, {
@@ -204,7 +285,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
 
 
 
-  const handleCategoryDelete = async (id: number) => {
+  const handleCategoryDelete = async (id: number | string) => {
     if (confirm("Supprimer ce rayon ? Cela ne supprimera pas les produits associés.")) {
       try {
         const res = await fetch(`/api/admin/categories/${id}`, {
@@ -218,7 +299,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const handleAssetUpdate = async (id: number, data: any) => {
+  const handleAssetUpdate = async (id: number | string, data: Partial<AdminAsset>) => {
     try {
       const res = await fetch(`/api/admin/assets/${id}`, {
         method: "PATCH",
@@ -234,11 +315,13 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         p.category_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    const matchesCategory = categoryFilter === 'all' || p.category_name === categoryFilter;
+  const filteredProducts = products.filter((p) => {
+    const normalizedSearch = searchTerm.toLowerCase();
+    const matchesSearch =
+      p.name.toLowerCase().includes(normalizedSearch) ||
+      p.category_name.toLowerCase().includes(normalizedSearch);
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    const matchesCategory = categoryFilter === "all" || p.category_name === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
@@ -254,10 +337,10 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
           <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-12 gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-[1px] bg-amber-600"></span>
+                <span className="w-6 h-px bg-amber-600"></span>
                 <span className="text-[8px] md:text-[9px] text-amber-400 font-bold tracking-[0.3em]">ADMIN</span>
               </div>
-              <h1 className="text-xl md:text-3xl lg:text-4xl font-serif italic font-bold text-white leading-tight break-words">
+              <h1 className="text-xl md:text-3xl lg:text-4xl font-serif italic font-bold text-white leading-tight break-word">
                 {activeTab === "stats"
                   ? "Performances"
                   : activeTab === "products"
@@ -425,107 +508,104 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
 }
 
 function NewsletterView({ token }: { token: string }) {
-  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/newsletter", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setSubscribers(data);
-        setLoading(false);
-      })
-      .catch((err) => console.error(err));
+    let mounted = true;
+
+    const loadSubscribers = async () => {
+      try {
+        const response = await fetch("/api/admin/newsletter", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = (await response.json()) as NewsletterSubscriber[];
+        if (mounted) {
+          setSubscribers(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error(err);
+        if (mounted) {
+          setSubscribers([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSubscribers();
+
+    return () => {
+      mounted = false;
+    };
   }, [token]);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="flex justify-between items-end mb-12">
-        <div>
-          <h3 className="text-4xl font-serif mb-4 italic">Club WhatsApp</h3>
-          <p className="text-neutral-400 text-sm font-light">
+    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <h3 className="text-3xl md:text-4xl font-serif italic">Club WhatsApp</h3>
+          <p className="text-neutral-400 text-sm font-light max-w-2xl">
             Liste des clientes inscrites pour recevoir les nouveautés.
           </p>
         </div>
-        <div className="bg-editorial-gold/10 text-editorial-gold px-6 py-3 rounded-full label-caps !text-[10px]">
-          {subscribers.length} Abonnées
+        <div className="inline-flex w-fit items-center gap-2 bg-editorial-gold/10 text-editorial-gold px-4 py-3 rounded-full label-caps text-[10px]!">
+          {subscribers.length} abonnées
         </div>
       </div>
 
-      <div className="bg-white editorial-border shadow-2xl overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-neutral-50 border-b border-neutral-100">
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">
-                Date d'inscription
-              </th>
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">
-                Numéro WhatsApp
-              </th>
-              <th className="p-6 label-caps !text-[10px] text-neutral-400">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="p-20 text-center animate-pulse text-neutral-300 font-serif italic"
-                >
-                  Chargement du club...
-                </td>
-              </tr>
-            ) : subscribers.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="p-20 text-center text-neutral-300 font-serif italic text-xl"
-                >
-                  Aucune inscription pour le moment.
-                </td>
-              </tr>
-            ) : (
-              subscribers.map((sub) => (
-                <tr
-                  key={sub.id}
-                  className="border-b border-neutral-50 hover:bg-neutral-50/50 transition-colors"
-                >
-                  <td className="p-6 text-xs text-neutral-500">
-                    {new Date(sub.created_at).toLocaleDateString("fr-FR", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="p-6">
-                    <a
-                      href={`https://wa.me/${sub.whatsapp.replace(/\D/g, "")}`}
-                      target="_blank"
-                      className="text-editorial-text font-mono font-bold hover:text-editorial-gold transition-colors flex items-center gap-2"
-                    >
-                      <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
-                        <MessageCircle size={14} className="text-[#25D366]" />
-                      </div>
-                      {sub.whatsapp}
-                    </a>
-                  </td>
-                  <td className="p-6">
-                    <button className="text-neutral-300 hover:text-red-500 transition-colors label-caps !text-[9px]">
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="bg-white editorial-border shadow-2xl p-8 md:p-12 text-center animate-pulse text-neutral-300 font-serif italic">
+          Chargement du club...
+        </div>
+      ) : subscribers.length === 0 ? (
+        <div className="bg-white editorial-border shadow-2xl p-8 md:p-12 text-center text-neutral-300 font-serif italic text-xl">
+          Aucune inscription pour le moment.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+          {subscribers.map((sub) => {
+            const prettyDate = new Date(sub.created_at).toLocaleDateString("fr-FR", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+            return (
+              <article
+                key={sub.id}
+                className="bg-white editorial-border shadow-[0_12px_40px_-20px_rgba(0,0,0,0.35)] p-5 md:p-6 flex flex-col gap-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="label-caps text-[9px]! text-neutral-400">Date d'inscription</p>
+                    <p className="text-sm text-neutral-700 mt-2">{prettyDate}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                    <MessageCircle size={16} className="text-[#25D366]" />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="label-caps text-[9px]! text-neutral-400 mb-2">Numéro WhatsApp</p>
+                  <a
+                    href={`https://wa.me/${sub.whatsapp.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono font-bold text-editorial-text break-all hover:text-editorial-gold transition-colors"
+                  >
+                    {sub.whatsapp}
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -538,13 +618,13 @@ function StatCard({ title, value, icon, color = "bg-white border-neutral-100" }:
       whileHover={{ y: -5 }}
       className={cn("p-10 editorial-border shadow-2xl relative overflow-hidden group", color)}
     >
-      <div className="absolute top-0 right-0 w-24 h-24 bg-neutral-900/[0.02] rounded-bl-full -mr-12 -mt-12 group-hover:bg-editorial-gold/5 transition-all duration-700"></div>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-neutral-900/2 rounded-bl-full -mr-12 -mt-12 group-hover:bg-editorial-gold/5 transition-all duration-700"></div>
       
       <div className="flex justify-between items-start mb-8 relative z-10">
         <div className="p-4 bg-neutral-50 rounded-2xl group-hover:bg-white group-hover:shadow-lg transition-all duration-500">{icon}</div>
       </div>
       <div className="relative z-10">
-        <p className="label-caps !text-[9px] tracking-[0.3em] font-bold text-neutral-400 mb-3">{title}</p>
+        <p className="label-caps text-[9px]! tracking-[0.3em] font-bold text-neutral-400 mb-3">{title}</p>
         <p className="text-5xl font-serif text-neutral-900 group-hover:text-editorial-gold transition-colors duration-500">{value}</p>
       </div>
     </motion.div>
@@ -590,7 +670,7 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
          <div className="lg:col-span-2 bg-white p-10 editorial-border shadow-sm">
             <div className="flex justify-between items-center mb-10">
                <h3 className="text-2xl font-serif italic">Commandes Récentes</h3>
-               <button onClick={() => setActiveTab('orders')} className="label-caps !text-[9px] text-editorial-gold hover:underline">Voir tout</button>
+               <button onClick={() => setActiveTab('orders')} className="label-caps text-[9px]! text-editorial-gold hover:underline">Voir tout</button>
             </div>
             <div className="space-y-6">
                {latestOrders.length > 0 ? latestOrders.map((o: any) => (
@@ -602,7 +682,7 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
                     <div className="text-right">
                        <p className="font-mono font-bold text-editorial-gold">{formatPrice(o.total_price)}</p>
                        <span className={cn(
-                          "px-2 py-1 label-caps !text-[8px] border mt-2 inline-block",
+                        "px-2 py-1 label-caps text-[8px]! border mt-2 inline-block",
                           o.status === 'pending' ? "bg-orange-50 text-orange-600 border-orange-100" : "bg-green-50 text-green-600 border-green-100"
                        )}>{o.status}</span>
                     </div>
@@ -615,7 +695,7 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
          <div className="bg-white p-10 editorial-border shadow-sm">
             <div className="flex justify-between items-center mb-10">
                <h3 className="text-2xl font-serif italic">Avis Clients</h3>
-               <button onClick={() => setActiveTab('reviews')} className="label-caps !text-[9px] text-editorial-gold hover:underline">Modérer</button>
+               <button onClick={() => setActiveTab('reviews')} className="label-caps text-[9px]! text-editorial-gold hover:underline">Modérer</button>
             </div>
             <div className="space-y-6">
                {reviews.slice(0, 3).map((r: any) => (
@@ -642,7 +722,7 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
                {stats.mostViewed.map((p: any, i: number) => (
                  <div key={i} className="flex items-center justify-between group p-3 hover:bg-neutral-50 transition-all">
                    <span className="font-medium text-neutral-600 font-serif text-lg">{p.name}</span>
-                   <span className="label-caps !text-[9px] bg-neutral-100 px-3 py-1 font-bold">{p.views} VUES</span>
+                   <span className="label-caps text-[9px]! bg-neutral-100 px-3 py-1 font-bold">{p.views} VUES</span>
                  </div>
                ))}
             </div>
@@ -652,14 +732,14 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
          <div className="bg-white p-10 editorial-border shadow-sm">
             <div className="flex justify-between items-center mb-10">
                <h3 className="text-2xl font-serif italic">Aperçu du Design</h3>
-               <button onClick={() => setActiveTab('assets')} className="label-caps !text-[9px] text-editorial-gold hover:underline">Modifier</button>
+               <button onClick={() => setActiveTab('assets')} className="label-caps text-[9px]! text-editorial-gold hover:underline">Modifier</button>
             </div>
             {heroAsset && (
               <div className="aspect-video relative editorial-border overflow-hidden group">
                  <img src={heroAsset.url} className="w-full h-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all duration-1000" />
                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                     <span className="label-caps text-white border border-white/20 px-6 py-3 mb-4">Bannière Active</span>
-                    <label className="bg-editorial-gold text-white px-6 py-3 label-caps !text-[9px] tracking-widest cursor-pointer hover:bg-white hover:text-editorial-text transition-all shadow-2xl">
+                    <label className="bg-editorial-gold text-white px-6 py-3 label-caps text-[9px]! tracking-widest cursor-pointer hover:bg-white hover:text-editorial-text transition-all shadow-2xl">
                       Remplacer maintenant
                       <input 
                         type="file" 
@@ -683,114 +763,164 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
   );
 }
 
-function ProductsView({ products, categories, searchTerm, statusFilter, categoryFilter, setSearchTerm, setStatusFilter, setCategoryFilter, onEdit, onDelete }: any) {
+function ProductsView({
+  products,
+  categories,
+  searchTerm,
+  statusFilter,
+  categoryFilter,
+  setSearchTerm,
+  setStatusFilter,
+  setCategoryFilter,
+  onEdit,
+  onDelete,
+}: {
+  products: Product[];
+  categories: Category[];
+  searchTerm: string;
+  statusFilter: string;
+  categoryFilter: string;
+  setSearchTerm: (value: string) => void;
+  setStatusFilter: (value: string) => void;
+  setCategoryFilter: (value: string) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (id: number | string) => void;
+}) {
   return (
     <div className="bg-white editorial-border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500">
-      <div className="p-8 border-b border-neutral-50 flex flex-col md:flex-row justify-between gap-6">
-         <div className="relative flex-1 max-w-md">
-           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
-           <input 
+      <div className="p-6 md:p-8 border-b border-neutral-50 flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+        <div className="relative flex-1 w-full md:max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+          <input
             type="text"
             placeholder="Rechercher un produit..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-neutral-50 editorial-border py-4 pl-12 pr-6 outline-none focus:border-editorial-gold text-[10px] label-caps"
-           />
-         </div>
-         <div className="flex gap-4">
-            <select 
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-neutral-50 editorial-border py-2 px-6 outline-none text-[10px] label-caps focus:border-editorial-gold"
-            >
-              <option value="all">Toutes les catégories</option>
-              {categories.map((c: any) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-neutral-50 editorial-border py-2 px-6 outline-none text-[10px] label-caps focus:border-editorial-gold"
-            >
-              <option value="all">Tous les états</option>
-              <option value="active">Actifs</option>
-              <option value="inactive">Inactifs</option>
-            </select>
-         </div>
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:flex md:gap-4">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-neutral-50 editorial-border py-3 px-4 outline-none text-[10px] label-caps focus:border-editorial-gold min-h-11"
+          >
+            <option value="all">Toutes les catégories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-neutral-50 editorial-border py-3 px-4 outline-none text-[10px] label-caps focus:border-editorial-gold min-h-11"
+          >
+            <option value="all">Tous les états</option>
+            <option value="active">Actifs</option>
+            <option value="inactive">Inactifs</option>
+          </select>
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-neutral-50">
-            <tr className="label-caps !text-[9px] text-neutral-500 text-left border-b border-neutral-100">
-              <th className="px-8 py-6">Produit</th>
-              <th className="px-8 py-6">Catégorie</th>
-              <th className="px-8 py-6">Prix</th>
-              <th className="px-8 py-6">Stock</th>
-              <th className="px-8 py-6">État</th>
-              <th className="px-8 py-6 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-50">
-            {products.map((p: any) => (
-              <tr key={p.id} className="hover:bg-neutral-50/50 transition-colors">
-                <td className="px-8 py-6">
-                  <div className="flex items-center gap-4">
-                    <img src={p.image_url} className="w-12 h-12 object-cover editorial-border" />
-                    <div className="flex flex-col">
-                      <span className="font-serif font-bold text-neutral-900">{p.name}</span>
-                      <span className="text-[10px] text-neutral-400 uppercase italic">{p.badge || "Standard"}</span>
+
+      <div className="p-4 md:p-6 space-y-4">
+        {products.length === 0 ? (
+          <div className="p-8 text-center text-neutral-400 italic bg-neutral-50 editorial-border">Aucun produit trouvé.</div>
+        ) : (
+          products.map((p) => (
+            <article
+              key={p.id}
+              className="bg-neutral-50/60 editorial-border p-4 md:p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+            >
+              <div className="flex items-start gap-4 min-w-0">
+                <img src={p.image_url} alt={p.name} className="w-16 h-16 md:w-20 md:h-20 object-cover editorial-border shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-serif font-bold text-neutral-900 text-lg leading-tight wrap-break-word">{p.name}</h4>
+                      <p className="text-[10px] text-neutral-400 uppercase italic mt-1 wrap-break-word">{p.badge || "Standard"}</p>
+                    </div>
+                    <span className={cn(
+                      "shrink-0 px-3 py-1 label-caps text-[8px]! border",
+                      p.status === "active"
+                        ? "bg-green-50 text-green-700 border-green-100"
+                        : "bg-neutral-100 text-neutral-500 border-neutral-200"
+                    )}>
+                      {p.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="label-caps text-[9px]! text-neutral-400">Catégorie</p>
+                      <p className="text-neutral-700 wrap-break-word">{p.category_name}</p>
+                    </div>
+                    <div>
+                      <p className="label-caps text-[9px]! text-neutral-400">Prix</p>
+                      <p className="font-mono font-bold text-neutral-900">{formatPrice(p.price)}</p>
+                    </div>
+                    <div>
+                      <p className="label-caps text-[9px]! text-neutral-400">Stock</p>
+                      <p className={cn("font-bold", p.stock <= 5 ? "text-red-500" : "text-neutral-600")}>{p.stock}</p>
                     </div>
                   </div>
-                </td>
-                <td className="px-8 py-6"><span className="label-caps !text-[9px] opacity-60 text-xs">{p.category_name}</span></td>
-                <td className="px-8 py-6 font-mono text-sm font-bold">{formatPrice(p.price)}</td>
-                <td className="px-8 py-6">
-                  <span className={cn(
-                    "text-xs font-bold px-2 py-1",
-                    p.stock <= 5 ? "bg-red-50 text-red-500" : "text-neutral-500"
-                  )}>
-                    {p.stock}
-                  </span>
-                </td>
-                <td className="px-8 py-6">
-                  <span className={cn(
-                    "px-3 py-1 label-caps !text-[8px] border",
-                    p.status === 'active' ? "bg-green-50 text-green-700 border-green-100" : "bg-neutral-100 text-neutral-500 border-neutral-200"
-                  )}>
-                    {p.status}
-                  </span>
-                </td>
-                <td className="px-8 py-6 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => onEdit(p)} className="p-2 text-neutral-400 hover:text-editorial-gold hover:bg-neutral-50 transition-all"><Edit size={16} /></button>
-                    <button onClick={() => onDelete(p.id)} className="p-2 text-neutral-400 hover:text-red-500 hover:bg-neutral-50 transition-all"><Trash2 size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 self-end md:self-auto">
+                <button
+                  onClick={() => onEdit(p)}
+                  className="min-w-11 min-h-11 p-2 text-neutral-400 hover:text-editorial-gold hover:bg-white transition-all editorial-border"
+                  aria-label={`Modifier ${p.name}`}
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  onClick={() => onDelete(p.id)}
+                  className="min-w-11 min-h-11 p-2 text-neutral-400 hover:text-red-500 hover:bg-white transition-all editorial-border"
+                  aria-label={`Supprimer ${p.name}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function ReviewsView({ reviews, filter, setFilter, onStatusChange, onFeatureChange, onDelete }: any) {
-  const filtered = reviews.filter((r: any) => {
-    if (filter === 'all') return true;
-    if (filter === 'featured') return r.is_featured === 1;
+function ReviewsView({
+  reviews,
+  filter,
+  setFilter,
+  onStatusChange,
+  onFeatureChange,
+  onDelete,
+}: {
+  reviews: Review[];
+  filter: string;
+  setFilter: (value: string) => void;
+  onStatusChange: (id: number | string, status: string) => void;
+  onFeatureChange: (id: number | string, isFeatured: number) => void;
+  onDelete: (id: number | string) => void;
+}) {
+  const filtered = reviews.filter((r) => {
+    if (filter === "all") return true;
+    if (filter === "featured") return r.is_featured === 1;
     return r.status === filter;
   });
 
   return (
     <div className="bg-white editorial-border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500">
-      <div className="p-8 border-b border-neutral-50 flex justify-between items-center bg-neutral-50/30">
+      <div className="p-6 md:p-8 border-b border-neutral-50 flex flex-col gap-4 md:flex-row md:justify-between md:items-center bg-neutral-50/30">
         <h3 className="font-serif text-2xl">Modération des avis</h3>
-        <select 
+        <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-white editorial-border py-2 px-6 outline-none text-[10px] label-caps focus:border-editorial-gold"
+          className="bg-white editorial-border py-3 px-4 outline-none text-[10px] label-caps focus:border-editorial-gold min-h-11"
         >
           <option value="all">Tout voir</option>
           <option value="approved">Approuvés</option>
@@ -798,95 +928,110 @@ function ReviewsView({ reviews, filter, setFilter, onStatusChange, onFeatureChan
           <option value="featured">Mis en avant</option>
         </select>
       </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="label-caps !text-[9px] text-neutral-500 text-left border-b border-neutral-100 bg-neutral-50/50">
-              <th className="px-8 py-6">Cliente</th>
-              <th className="px-8 py-6">Produit</th>
-              <th className="px-8 py-6">Note</th>
-              <th className="px-8 py-6">Commentaire</th>
-              <th className="px-8 py-6">État</th>
-              <th className="px-8 py-6 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-50">
-            {filtered.map((r: any) => (
-              <tr key={r.id} className="hover:bg-neutral-50/30 transition-colors">
-                <td className="px-8 py-6">
-                  <div className="font-serif font-bold text-neutral-900">{r.customer_name}</div>
-                  <div className="text-[9px] text-neutral-400 font-mono italic">{new Date(r.created_at).toLocaleDateString()}</div>
-                </td>
-                <td className="px-8 py-6">
-                  <div className="text-xs font-medium text-neutral-600 uppercase tracking-tight">{r.product_name}</div>
-                </td>
-                <td className="px-8 py-6">
-                  <div className="flex gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={10} className={i < r.rating ? "fill-editorial-gold text-editorial-gold" : "text-neutral-200"} />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-8 py-6 max-w-xs">
-                  <p className="text-xs text-neutral-500 italic line-clamp-2">"{r.comment}"</p>
-                </td>
-                <td className="px-8 py-6">
-                  <span className={cn(
-                    "px-3 py-1 label-caps !text-[8px] border",
-                    r.status === 'approved' ? "bg-green-50 text-green-700 border-green-100" : "bg-orange-50 text-orange-700 border-orange-100"
-                  )}>
-                    {r.status}
-                  </span>
-                </td>
-                <td className="px-8 py-6 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button 
-                      onClick={() => onFeatureChange(r.id, r.is_featured === 1 ? 0 : 1)}
-                      className={cn(
-                        "p-2 transition-all",
-                        r.is_featured === 1 ? "text-editorial-gold" : "text-neutral-300 hover:text-editorial-gold"
-                      )}
-                      title="Mettre en avant"
-                    >
-                      <Star size={16} fill={r.is_featured === 1 ? "currentColor" : "none"} />
-                    </button>
-                    <button 
-                      onClick={() => onStatusChange(r.id, r.status === 'approved' ? 'pending' : 'approved')}
-                      className="p-2 text-neutral-300 hover:text-blue-500 transition-all"
-                      title={r.status === 'approved' ? "Masquer" : "Approuver"}
-                    >
-                      {r.status === 'approved' ? <XIcon size={16} /> : <Check size={16} />}
-                    </button>
-                    <button 
-                      onClick={() => onDelete(r.id)}
-                      className="p-2 text-neutral-300 hover:text-red-500 transition-all"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="p-4 md:p-6 space-y-4">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-neutral-400 italic bg-neutral-50 editorial-border">Aucun avis correspondant.</div>
+        ) : (
+          filtered.map((r) => (
+            <article
+              key={r.id}
+              className="bg-neutral-50/60 editorial-border p-4 md:p-5 flex flex-col gap-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className="font-serif font-bold text-neutral-900 text-lg">{r.customer_name}</h4>
+                  <p className="text-[10px] text-neutral-400 font-mono italic mt-1">
+                    {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                  </p>
+                  <p className="text-xs font-medium text-neutral-600 uppercase tracking-tight mt-2 wrap-break-word">
+                    {r.product_name}
+                  </p>
+                </div>
+
+                <span
+                  className={cn(
+                    "shrink-0 px-3 py-1 label-caps text-[8px]! border",
+                    r.status === "approved"
+                      ? "bg-green-50 text-green-700 border-green-100"
+                      : "bg-orange-50 text-orange-700 border-orange-100"
+                  )}
+                >
+                  {r.status}
+                </span>
+              </div>
+
+              <div className="flex gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    size={14}
+                    className={i < r.rating ? "fill-editorial-gold text-editorial-gold" : "text-neutral-200"}
+                  />
+                ))}
+              </div>
+
+              <p className="text-sm text-neutral-600 italic leading-relaxed wrap-break-word">
+                “{r.comment}”
+              </p>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => onFeatureChange(r.id, r.is_featured === 1 ? 0 : 1)}
+                  className={cn(
+                    "min-w-11 min-h-11 p-2 editorial-border transition-all",
+                    r.is_featured === 1 ? "text-editorial-gold" : "text-neutral-300 hover:text-editorial-gold"
+                  )}
+                  title="Mettre en avant"
+                >
+                  <Star size={16} fill={r.is_featured === 1 ? "currentColor" : "none"} />
+                </button>
+                <button
+                  onClick={() => onStatusChange(r.id, r.status === "approved" ? "pending" : "approved")}
+                  className="min-w-11 min-h-11 p-2 editorial-border text-neutral-300 hover:text-blue-500 transition-all"
+                  title={r.status === "approved" ? "Masquer" : "Approuver"}
+                >
+                  {r.status === "approved" ? <XIcon size={16} /> : <Check size={16} />}
+                </button>
+                <button
+                  onClick={() => onDelete(r.id)}
+                  className="min-w-11 min-h-11 p-2 editorial-border text-neutral-300 hover:text-red-500 transition-all"
+                  title="Supprimer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function OrdersView({ orders, filter, setFilter, onStatusChange, onDelete }: any) {
-  const filtered = orders.filter((o: any) => filter === 'all' || o.status === filter);
+function OrdersView({
+  orders,
+  filter,
+  setFilter,
+  onStatusChange,
+  onDelete,
+}: {
+  orders: AdminOrder[];
+  filter: string;
+  setFilter: (value: string) => void;
+  onStatusChange: (id: number | string, status: string) => void;
+  onDelete: (id: number | string) => void;
+}) {
+  const filtered = orders.filter((o) => filter === "all" || o.status === filter);
 
   return (
     <div className="bg-white editorial-border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500">
-      <div className="p-8 border-b border-neutral-50 flex justify-between items-center bg-neutral-50/30">
+      <div className="p-6 md:p-8 border-b border-neutral-50 flex flex-col gap-4 md:flex-row md:justify-between md:items-center bg-neutral-50/30">
         <h3 className="font-serif text-2xl">Gestion des commandes</h3>
-        <select 
+        <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-white editorial-border py-2 px-6 outline-none text-[10px] label-caps focus:border-editorial-gold"
+          className="bg-white editorial-border py-3 px-4 outline-none text-[10px] label-caps focus:border-editorial-gold min-h-11"
         >
           <option value="all">Toutes les commandes</option>
           <option value="pending">En attente</option>
@@ -896,52 +1041,42 @@ function OrdersView({ orders, filter, setFilter, onStatusChange, onDelete }: any
           <option value="cancelled">Annulées</option>
         </select>
       </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="label-caps !text-[9px] text-neutral-500 text-left border-b border-neutral-100 bg-neutral-50/50">
-              <th className="px-8 py-6">Client / Quartier</th>
-              <th className="px-8 py-6">Articles</th>
-              <th className="px-8 py-6">Total</th>
-              <th className="px-8 py-6">État</th>
-              <th className="px-8 py-6 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-50">
-            {filtered.map((o: any) => (
-              <tr key={o.id} className="hover:bg-neutral-50/30 transition-colors align-top">
-                <td className="px-8 py-6">
-                  <div className="font-serif font-bold text-neutral-900">{o.customer_name}</div>
-                  <div className="text-[10px] label-caps text-editorial-gold flex items-center gap-1 mt-1">
+
+      <div className="p-4 md:p-6 space-y-4">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-neutral-400 italic bg-neutral-50 editorial-border">Aucune commande trouvée.</div>
+        ) : (
+          filtered.map((o) => (
+            <article
+              key={o.id}
+              className="bg-neutral-50/60 editorial-border p-4 md:p-5 flex flex-col gap-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className="font-serif font-bold text-neutral-900 text-lg">{o.customer_name}</h4>
+                  <p className="text-[10px] label-caps text-editorial-gold flex items-center gap-1 mt-1 wrap-break-word">
                     <MapPin size={10} /> {o.neighborhood}
-                  </div>
-                  <div className="text-[11px] text-neutral-400 mt-1 font-mono">{o.customer_phone}</div>
-                  <div className="text-[9px] text-neutral-400 font-mono italic mt-2">{new Date(o.created_at).toLocaleString()}</div>
-                </td>
-                <td className="px-8 py-6">
-                  <div className="space-y-2">
-                    {o.items.map((item: any, idx: number) => (
-                      <div key={idx} className="text-xs text-neutral-600 flex flex-col">
-                        <span className="font-bold">{item.product_name} x{item.quantity}</span>
-                        <span className="text-[10px] text-neutral-400 italic">
-                          {item.color ? `C: ${item.color}` : ''} {item.size ? `T: ${item.size}` : ''}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-8 py-6 font-mono text-sm font-bold">{formatPrice(o.total_price)}</td>
-                <td className="px-8 py-6">
-                  <select 
+                  </p>
+                  <p className="text-[11px] text-neutral-400 mt-1 font-mono break-all">{o.customer_phone}</p>
+                  <p className="text-[9px] text-neutral-400 font-mono italic mt-2">
+                    {new Date(o.created_at).toLocaleString("fr-FR")}
+                  </p>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <p className="font-mono text-sm font-bold text-neutral-900">{formatPrice(o.total_price)}</p>
+                  <select
                     value={o.status}
                     onChange={(e) => onStatusChange(o.id, e.target.value)}
                     className={cn(
-                      "px-2 py-1 label-caps !text-[8px] border outline-none",
-                      o.status === 'pending' ? "bg-orange-50 text-orange-700 border-orange-100" :
-                      o.status === 'confirmed' ? "bg-blue-50 text-blue-700 border-blue-100" :
-                      o.status === 'delivered' ? "bg-green-50 text-green-700 border-green-100" :
-                      "bg-neutral-50 text-neutral-500 border-neutral-100"
+                      "mt-2 py-2 px-3 label-caps text-[8px]! border outline-none min-h-11",
+                      o.status === "pending"
+                        ? "bg-orange-50 text-orange-700 border-orange-100"
+                        : o.status === "confirmed"
+                        ? "bg-blue-50 text-blue-700 border-blue-100"
+                        : o.status === "delivered"
+                        ? "bg-green-50 text-green-700 border-green-100"
+                        : "bg-neutral-50 text-neutral-500 border-neutral-100"
                     )}
                   >
                     <option value="pending">En attente</option>
@@ -950,19 +1085,36 @@ function OrdersView({ orders, filter, setFilter, onStatusChange, onDelete }: any
                     <option value="delivered">Livrée</option>
                     <option value="cancelled">Annulée</option>
                   </select>
-                </td>
-                <td className="px-8 py-6 text-right">
-                  <button 
-                    onClick={() => onDelete(o.id)}
-                    className="p-2 text-neutral-300 hover:text-red-500 transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {o.items.map((item, idx) => (
+                  <div key={`${o.id}-${idx}`} className="bg-white editorial-border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-bold text-sm text-neutral-700 wrap-break-word">
+                        {item.product_name} x{item.quantity}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 italic mt-1 wrap-break-word">
+                      {item.color ? `C: ${item.color}` : ""} {item.size ? `T: ${item.size}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end">
+                <button
+                  onClick={() => onDelete(o.id)}
+                  className="min-w-11 min-h-11 p-2 editorial-border text-neutral-300 hover:text-red-500 transition-all"
+                  aria-label={`Supprimer la commande ${o.customer_name}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))
+        )}
       </div>
     </div>
   );
@@ -975,7 +1127,7 @@ function CategoriesView({ categories, onAdd, onDelete }: any) {
         <h3 className="font-serif text-2xl">Gestion des rayons</h3>
         <button 
           onClick={onAdd}
-          className="bg-editorial-text text-white px-6 py-2 label-caps !text-[9px] flex items-center gap-2"
+          className="bg-editorial-text text-white px-6 py-2 label-caps text-[9px]! flex items-center gap-2"
         >
           <Plus size={14} /> Ajouter un rayon
         </button>
@@ -1007,7 +1159,7 @@ function ActivityView({ activity }: any) {
               <div className="p-3 bg-neutral-100 rounded-xl mt-1"><Activity size={16} className="text-neutral-400" /></div>
               <div className="flex-1 space-y-1">
                  <div className="flex justify-between items-center">
-                    <span className="font-bold label-caps !text-[10px] text-editorial-text">{log.action}</span>
+                    <span className="font-bold label-caps text-[10px]! text-editorial-text">{log.action}</span>
                     <span className="font-mono text-[10px] text-neutral-400">{new Date(log.timestamp).toLocaleString('fr-FR')}</span>
                  </div>
                  <p className="text-sm text-neutral-500">{log.details}</p>
@@ -1052,19 +1204,19 @@ function AssetsView({ assets, token, onUpdate }: any) {
           <div key={asset.id} className="bg-white editorial-border shadow-[0_15px_40px_-15px_rgba(0,0,0,0.1)] group overflow-hidden flex flex-col hover:shadow-2xl transition-all duration-500">
             {/* Header Badge */}
             <div className="px-6 py-4 border-b border-neutral-50 flex justify-between items-center bg-neutral-50/30">
-               <span className="label-caps !text-[9px] text-editorial-gold font-bold tracking-widest">{asset.category}</span>
+               <span className="label-caps text-[9px]! text-editorial-gold font-bold tracking-widest">{asset.category}</span>
                <code className="text-[8px] text-neutral-300 font-mono uppercase">{asset.key}</code>
             </div>
 
             {/* Image Preview Container */}
-            <div className="relative aspect-[16/10] bg-neutral-100 overflow-hidden">
+            <div className="relative aspect-16/10 bg-neutral-100 overflow-hidden">
               <img 
                 src={asset.url} 
                 alt={asset.label} 
-                className="w-full h-full object-cover transition-transform duration-[1500ms] group-hover:scale-110"
+                className="w-full h-full object-cover transition-transform duration-1500 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col items-center justify-center gap-4 p-8">
-                <label className="w-full bg-white text-editorial-text px-6 py-4 label-caps !text-[9px] tracking-widest cursor-pointer hover:bg-editorial-gold hover:text-white transition-all text-center shadow-2xl">
+                <label className="w-full bg-white text-editorial-text px-6 py-4 label-caps text-[9px]! tracking-widest cursor-pointer hover:bg-editorial-gold hover:text-white transition-all text-center shadow-2xl">
                   Télécharger nouvelle photo
                   <input 
                     type="file" 
@@ -1082,7 +1234,7 @@ function AssetsView({ assets, token, onUpdate }: any) {
                     const url = prompt("Entrez l'URL de l'image :", asset.url);
                     if (url && url !== asset.url) onUpdate(asset.id, { url });
                   }}
-                  className="w-full bg-neutral-900/80 backdrop-blur-sm text-white px-6 py-4 label-caps !text-[9px] tracking-widest hover:bg-neutral-900 transition-all border border-white/10"
+                  className="w-full bg-neutral-900/80 backdrop-blur-sm text-white px-6 py-4 label-caps text-[9px]! tracking-widest hover:bg-neutral-900 transition-all border border-white/10"
                 >
                   Utiliser un lien URL
                 </button>
@@ -1117,7 +1269,7 @@ function AssetsView({ assets, token, onUpdate }: any) {
                            if (content !== null) onUpdate(asset.id, { content });
                          }
                        }}
-                       className="bg-editorial-gold/10 text-editorial-gold px-4 py-2 label-caps !text-[9px] hover:bg-editorial-gold hover:text-white transition-all rounded-sm font-bold"
+                       className="bg-editorial-gold/10 text-editorial-gold px-4 py-2 label-caps text-[9px]! hover:bg-editorial-gold hover:text-white transition-all rounded-sm font-bold"
                      >
                        Personnaliser
                      </button>

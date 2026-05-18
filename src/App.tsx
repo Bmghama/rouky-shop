@@ -44,10 +44,10 @@ function Home() {
     >
       {/* Immersive Background Layers */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <motion.div 
-          style={{ y: smoothY1 }}
-          className="absolute top-1/4 -left-20 w-[800px] h-[800px] bg-editorial-rose rounded-full opacity-[0.07] blur-[150px]"
-        />
+          <motion.div 
+            style={{ y: smoothY1 }}
+            className="absolute top-1/4 -left-20 w-200 h-200 bg-editorial-rose rounded-full opacity-[0.07] blur-[150px]"
+          />
         <motion.div 
           style={{ y: smoothY2 }}
           className="absolute top-1/2 -right-40 w-[600px] h-[600px] bg-editorial-beige rounded-full opacity-[0.08] blur-[120px]"
@@ -75,8 +75,8 @@ function Home() {
                 className="space-y-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-[1px] bg-editorial-gold opacity-50"></div>
-                  <span className="label-caps text-editorial-gold tracking-[0.5em] !text-[9px]">Excellence</span>
+                  <div className="w-10 h-px bg-editorial-gold opacity-50"></div>
+                  <span className="label-caps text-editorial-gold tracking-[0.5em] text-[9px]!">Excellence</span>
                 </div>
                 <h2 className="text-4xl md:text-6xl font-serif tracking-tight">Meilleures Ventes</h2>
               </motion.div>
@@ -101,8 +101,8 @@ function Home() {
             className="mb-20 md:mb-32 relative px-6 md:px-12"
           >
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-10 h-[1px] bg-editorial-gold opacity-50"></div>
-              <span className="label-caps text-editorial-gold tracking-[0.6em] !text-[11px]">Découverte</span>
+              <div className="w-10 h-px bg-editorial-gold opacity-50"></div>
+              <span className="label-caps text-editorial-gold tracking-[0.6em] text-[11px]!">Découverte</span>
             </div>
             <h2 className="text-5xl md:text-8xl font-serif mt-2 tracking-tighter">Nos Univers</h2>
           </motion.div>
@@ -121,8 +121,8 @@ function Home() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-10 border-b border-neutral-100 pb-16">
              <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-[1px] bg-editorial-gold opacity-50"></div>
-                  <span className="label-caps text-editorial-gold tracking-[0.5em] !text-[9px]">Premium Catalog</span>
+                  <div className="w-10 h-px bg-editorial-gold opacity-50"></div>
+                  <span className="label-caps text-editorial-gold tracking-[0.5em] text-[9px]!">Premium Catalog</span>
                 </div>
                 <h2 className="text-4xl md:text-6xl font-serif">Toute la Boutique</h2>
              </div>
@@ -148,6 +148,7 @@ function Home() {
                <Quote className="mx-auto text-editorial-gold/40 mb-6 md:mb-8 w-12 md:w-20" strokeWidth={1} />
                <h2 className="text-4xl md:text-6xl font-serif italic mb-4">L'expérience Rouky</h2>
                <p className="label-caps tracking-[0.5em] text-editorial-gold/60 !text-[8px] md:!text-xs">Témoignages</p>
+                           <p className="label-caps tracking-[0.5em] text-editorial-gold/60 text-[8px]! md:text-xs">Témoignages</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 xl:gap-20">
               <ReviewCard name="Sira K." text="La qualité des robes est exceptionnelle. J'ai reçu ma commande en 24h via WhatsApp." />
@@ -231,11 +232,13 @@ function CategoryCard({ title, img, delay = 0 }: { title: string; img: string; d
       {/* Overlay */}
       <div className="absolute inset-0 bg-editorial-text/20 group-hover:bg-editorial-text/40 transition-all duration-700"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-editorial-text/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-editorial-text/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
       
       {/* Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 p-12 text-center">
         <h3 className="text-5xl font-serif mb-8 tracking-wide transform group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl">{title}</h3>
         <div className="w-16 h-[1px] bg-white mb-8 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
+          <div className="w-16 h-px bg-white mb-8 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
         <button className="label-caps tracking-[0.4em] !text-[9px] border-b border-white pb-2 opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-700 hover:text-editorial-gold hover:border-editorial-gold">
           Explorer la Gamme
         </button>
@@ -263,6 +266,7 @@ function ReviewCard({ name, text }: { name: string; text: string }) {
       <p className="text-white italic tracking-wide mb-12 leading-[1.8] text-xl font-light">"{text}"</p>
       <div className="flex items-center gap-6">
         <div className="w-12 h-[1px] bg-editorial-gold"></div>
+          <div className="w-12 h-px bg-editorial-gold"></div>
         <p className="label-caps !text-[10px] text-editorial-gold tracking-[0.4em]">{name}</p>
       </div>
       {/* Decorative Quote Mark */}

@@ -139,7 +139,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[100] flex justify-end"
+      className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-100 flex justify-end"
     >
       <motion.div
         initial={{ x: "100%" }}
@@ -162,7 +162,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
           {/* Main Info */}
           <div className="grid grid-cols-2 gap-6">
             <div className="col-span-2">
-              <label className="label-caps !text-[10px] mb-2 block">Nom du produit</label>
+              <label className="label-caps text-[10px]! mb-2 block">Nom du produit</label>
               <input
                 required
                 type="text"
@@ -174,7 +174,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
             
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Prix (FCFA)</label>
+              <label className="label-caps text-[10px]! mb-2 block">Prix (FCFA)</label>
               <input
                 required
                 type="number"
@@ -185,7 +185,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
 
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Ancien Prix (FCFA)</label>
+              <label className="label-caps text-[10px]! mb-2 block">Ancien Prix (FCFA)</label>
               <input
                 type="number"
                 value={formData.old_price || 0}
@@ -198,7 +198,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
           {/* Categories & Inventory */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Catégorie</label>
+              <label className="label-caps text-[10px]! mb-2 block">Catégorie</label>
               <select
                 value={formData.category_id}
                 onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
@@ -211,7 +211,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
 
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Sous-catégorie</label>
+              <label className="label-caps text-[10px]! mb-2 block">Sous-catégorie</label>
               <input
                 type="text"
                 value={formData.sub_category}
@@ -222,7 +222,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
 
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Stock</label>
+              <label className="label-caps text-[10px]! mb-2 block">Stock</label>
               <input
                 required
                 type="number"
@@ -233,7 +233,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
 
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Badge</label>
+              <label className="label-caps text-[10px]! mb-2 block">Badge</label>
               <select
                 value={formData.badge}
                 onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
@@ -249,7 +249,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
 
           {/* Descriptions */}
           <div>
-            <label className="label-caps !text-[10px] mb-2 block">Description Courte</label>
+              <label className="label-caps text-[10px]! mb-2 block">Description Courte</label>
             <textarea
               required
               rows={2}
@@ -260,7 +260,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
           </div>
 
           <div>
-            <label className="label-caps !text-[10px] mb-2 block">Description Longue</label>
+              <label className="label-caps text-[10px]! mb-2 block">Description Longue</label>
             <textarea
               rows={4}
               value={formData.long_description}
@@ -273,7 +273,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
           <div className="space-y-6 p-6 bg-neutral-50 editorial-border">
             <div className="flex justify-between items-end mb-4">
               <div>
-                <label className="label-caps !text-[10px] block mb-1">Gestion des Médias</label>
+                <label className="label-caps text-[10px]! block mb-1">Gestion des Médias</label>
                 <p className="text-[10px] text-neutral-400">Importez plusieurs images. La première sera l'image principale par défaut.</p>
               </div>
               <div className="flex gap-2">
@@ -287,7 +287,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
                 />
                 <label 
                   htmlFor="multi-upload"
-                  className="bg-neutral-900 text-white px-6 py-2 label-caps !text-[9px] cursor-pointer hover:bg-neutral-800 transition-all shadow-lg flex items-center gap-2"
+                  className="bg-neutral-900 text-white px-6 py-2 label-caps text-[9px]! cursor-pointer hover:bg-neutral-800 transition-all shadow-lg flex items-center gap-2"
                 >
                   <Plus size={14} />
                   Importer des photos
@@ -297,18 +297,18 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
 
             {/* Main Image Selection */}
             <div className="mb-8">
-              <label className="label-caps !text-[9px] text-neutral-400 mb-2 block">Image Principale Actuelle</label>
+              <label className="label-caps text-[9px]! text-neutral-400 mb-2 block">Image Principale Actuelle</label>
               <div className="aspect-video w-full editorial-border bg-white overflow-hidden relative group">
                 {formData.image_url ? (
                   <img src={formData.image_url} className="w-full h-full object-contain" alt="Main" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-neutral-300">
                     <Upload size={32} className="mb-2" />
-                    <span className="label-caps !text-[10px]">Aucune image principale</span>
+                    <span className="label-caps text-[10px]!">Aucune image principale</span>
                   </div>
                 )}
                 <div className="absolute inset-0 bg-neutral-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="bg-white p-4 label-caps !text-[10px] text-neutral-900">
+                  <div className="bg-white p-4 label-caps text-[10px]! text-neutral-900">
                     Sélectionnez une image de la galerie
                   </div>
                 </div>
@@ -317,7 +317,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
 
             {/* Gallery Grid */}
             <div>
-              <label className="label-caps !text-[9px] text-neutral-400 mb-4 block">Galerie ({gallery.length} images)</label>
+              <label className="label-caps text-[9px]! text-neutral-400 mb-4 block">Galerie ({gallery.length} images)</label>
               <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
                 {gallery.map((url, i) => (
                   <div 
@@ -384,7 +384,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
           {/* Variations */}
           <div className="grid grid-cols-2 gap-8">
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Couleurs</label>
+              <label className="label-caps text-[10px]! mb-2 block">Couleurs</label>
               <div className="flex gap-2 mb-2">
                 <input id="color-input" type="text" className="flex-1 editorial-border px-3 py-1 outline-none text-sm" placeholder="Noir, Rouge..." />
                 <button 
@@ -407,7 +407,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
 
             <div>
-              <label className="label-caps !text-[10px] mb-2 block">Tailles</label>
+              <label className="label-caps text-[10px]! mb-2 block">Tailles</label>
               <div className="flex gap-2 mb-2">
                 <input id="size-input" type="text" className="flex-1 editorial-border px-3 py-1 outline-none text-sm" placeholder="S, M, L, XL..." />
                 <button 
@@ -432,7 +432,7 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
 
           {/* Highlights */}
           <div className="space-y-4 p-6 bg-neutral-50 editorial-border">
-             <label className="label-caps !text-[10px] block">Points Forts (3 max)</label>
+             <label className="label-caps text-[10px]! block">Points Forts (3 max)</label>
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[0, 1, 2].map((idx) => (
                   <div key={idx} className="space-y-2">
@@ -467,12 +467,12 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
 
           <div className="flex flex-col md:flex-row gap-6 p-6 bg-neutral-50 editorial-border">
             <div className="flex-1">
-              <label className="label-caps !text-[10px] mb-2 block">État du produit</label>
+              <label className="label-caps text-[10px]! mb-2 block">État du produit</label>
               <button 
                 type="button"
                 onClick={() => setFormData({...formData, status: formData.status === 'active' ? 'inactive' : 'active'})}
                 className={cn(
-                  "w-full px-6 py-3 label-caps !text-[9px] transition-all border",
+                  "w-full px-6 py-3 label-caps text-[9px]! transition-all border",
                   formData.status === 'active' ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200"
                 )}
               >
@@ -481,10 +481,10 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
             
             <div className="flex-1">
-              <label className="label-caps !text-[10px] mb-2 block">Aperçu rapide</label>
+              <label className="label-caps text-[10px]! mb-2 block">Aperçu rapide</label>
               <button 
                 type="button"
-                className="w-full px-6 py-3 label-caps !text-[9px] bg-white border border-neutral-200 hover:border-editorial-gold transition-all"
+                className="w-full px-6 py-3 label-caps text-[9px]! bg-white border border-neutral-200 hover:border-editorial-gold transition-all"
                 onClick={() => {
                   alert("Aperçu visuel:\nNom: " + formData.name + "\nStock: " + formData.stock + "\nPrix: " + formatPrice(formData.price || 0));
                 }}
@@ -495,18 +495,18 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-100 p-6 flex justify-end gap-4 z-[110] max-w-2xl ml-auto">
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-100 p-6 flex justify-end gap-4 z-110 max-w-2xl ml-auto">
             <button 
               type="button" 
               onClick={onClose}
-              className="px-8 py-3 label-caps !text-[10px] hover:bg-neutral-50 transition-colors"
+              className="px-8 py-3 label-caps text-[10px]! hover:bg-neutral-50 transition-colors"
             >
               Annuler
             </button>
             <button 
               type="submit"
               disabled={loading}
-              className="bg-editorial-text text-white px-12 py-3 label-caps !text-[10px] shadow-xl hover:bg-neutral-800 transition-all flex items-center gap-3"
+              className="bg-editorial-text text-white px-12 py-3 label-caps text-[10px]! shadow-xl hover:bg-neutral-800 transition-all flex items-center gap-3"
             >
               <Upload size={14} />
               {loading ? "Enregistrement..." : "Enregistrer le produit"}
