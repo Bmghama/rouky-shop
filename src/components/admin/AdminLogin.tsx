@@ -24,6 +24,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     try {
       const res = await fetch("/api/admin/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });

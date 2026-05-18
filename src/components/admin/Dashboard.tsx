@@ -89,17 +89,26 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
   const [reviewFilter, setReviewFilter] = useState("all");
   const [orderFilter, setOrderFilter] = useState("all");
 
+  const safeToken = token && token !== "undefined" && token !== "null" ? token : "";
+  const authHeaders: Record<string, string> = safeToken ? { Authorization: `Bearer ${safeToken}` } : {};
+
   const fetchWithTimeout = useCallback(async (url: string, opts: RequestInit = {}, timeout = 5000) => {
     const controller = new AbortController();
     const id = window.setTimeout(() => controller.abort(), timeout);
     try {
-      return await fetch(url, { ...opts, signal: controller.signal });
+      const existingHeaders = opts.headers && typeof opts.headers === "object" ? (opts.headers as Record<string, string>) : {};
+      return await fetch(url, {
+        credentials: "include",
+        ...opts,
+        headers: { ...(existingHeaders as Record<string, string>), ...authHeaders },
+        signal: controller.signal,
+      });
     } catch {
       return null;
     } finally {
       window.clearTimeout(id);
     }
-  }, []);
+  }, [authHeaders]);
 
   const fetchData = useCallback(async () => {
     const mockStats: Stats = {
@@ -116,7 +125,7 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       setError("");
       setLoading(true);
 
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = authHeaders;
       const [statsRes, prodRes, catRes, reviewRes, orderRes, assetRes] = await Promise.all([
         fetchWithTimeout("/api/admin/stats", { headers }),
         fetchWithTimeout("/api/products?status=all", { headers }),
@@ -173,8 +182,9 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     try {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { 
-          "Authorization": `Bearer ${token}`,
+          ...authHeaders,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ status })
@@ -189,8 +199,9 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     try {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { 
-          "Authorization": `Bearer ${token}`,
+          ...authHeaders,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ is_featured })
@@ -206,7 +217,8 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       try {
         const res = await fetch(`/api/admin/reviews/${id}`, {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include",
+          headers: { ...authHeaders }
         });
         if (res.ok) fetchData();
       } catch (err) {
@@ -225,7 +237,8 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       try {
         const res = await fetch(`/api/admin/products/${id}`, {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include",
+          headers: { ...authHeaders }
         });
         if (res.ok) fetchData();
       } catch (err) {
@@ -238,8 +251,9 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     try {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { 
-          "Authorization": `Bearer ${token}`,
+          ...authHeaders,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ status })
@@ -255,7 +269,8 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       try {
         const res = await fetch(`/api/admin/orders/${id}`, {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include",
+          headers: { ...authHeaders }
         });
         if (res.ok) fetchData();
       } catch (err) {
@@ -270,8 +285,9 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       try {
         const res = await fetch("/api/admin/categories", {
           method: "POST",
+          credentials: "include",
           headers: { 
-            "Authorization": `Bearer ${token}`,
+            ...authHeaders,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ name })
@@ -290,7 +306,8 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
       try {
         const res = await fetch(`/api/admin/categories/${id}`, {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
+          credentials: "include",
+          headers: { ...authHeaders }
         });
         if (res.ok) fetchData();
       } catch (err) {
@@ -303,8 +320,9 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
     try {
       const res = await fetch(`/api/admin/assets/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { 
-          "Authorization": `Bearer ${token}`,
+          ...authHeaders,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(data)
@@ -510,6 +528,8 @@ export default function Dashboard({ token, onLogout }: DashboardProps) {
 function NewsletterView({ token }: { token: string }) {
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
+  const safeToken = token && token !== "undefined" && token !== "null" ? token : "";
+  const authHeaders: Record<string, string> = safeToken ? { Authorization: `Bearer ${safeToken}` } : {};
 
   useEffect(() => {
     let mounted = true;
@@ -517,7 +537,8 @@ function NewsletterView({ token }: { token: string }) {
     const loadSubscribers = async () => {
       try {
         const response = await fetch("/api/admin/newsletter", {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+          headers: { ...authHeaders },
         });
         const data = (await response.json()) as NewsletterSubscriber[];
         if (mounted) {
@@ -632,6 +653,8 @@ function StatCard({ title, value, icon, color = "bg-white border-neutral-100" }:
 }
 
 function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpdate }: any) {
+  const safeToken = token && token !== "undefined" && token !== "null" ? token : "";
+  const authHeaders: Record<string, string> = safeToken ? { Authorization: `Bearer ${safeToken}` } : {};
   const latestOrders = orders.slice(0, 3);
   const pendingReviews = reviews.filter((r: any) => r.status === 'pending').slice(0, 3);
   const heroAsset = assets.find((a: any) => a.key === 'hero_main');
@@ -643,7 +666,8 @@ function StatsView({ stats, orders, reviews, assets, setActiveTab, token, onUpda
     try {
       const res = await fetch('/api/admin/upload', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+        headers: { ...authHeaders },
         body: formData
       });
       const data = await res.json();
@@ -1173,6 +1197,8 @@ function ActivityView({ activity }: any) {
 
 
 function AssetsView({ assets, token, onUpdate }: any) {
+  const safeToken = token && token !== "undefined" && token !== "null" ? token : "";
+  const authHeaders: Record<string, string> = safeToken ? { Authorization: `Bearer ${safeToken}` } : {};
   const handleUpload = async (id: number, file: File) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -1180,7 +1206,8 @@ function AssetsView({ assets, token, onUpdate }: any) {
     try {
       const res = await fetch('/api/admin/upload', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+        headers: { ...authHeaders },
         body: formData
       });
       const data = await res.json();

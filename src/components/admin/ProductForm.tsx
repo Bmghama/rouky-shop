@@ -44,6 +44,9 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
   const [highlights, setHighlights] = useState<{label: string, value: string}[]>(JSON.parse(formData.highlights || "[]"));
   const [loading, setLoading] = useState(false);
 
+  const safeToken = typeof token === "string" && token && token !== "undefined" && token !== "null" ? token : "";
+  const authHeaders: Record<string, string> = safeToken ? { Authorization: `Bearer ${safeToken}` } : {};
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -55,7 +58,8 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
       try {
         const res = await fetch("/api/admin/upload", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${token}` },
+          credentials: "include",
+          headers: { ...authHeaders },
           body: uploadData
         });
         const data = await res.json();
@@ -106,9 +110,10 @@ export default function ProductForm({ product, categories, onClose, onSubmit, to
     try {
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          ...authHeaders
         },
         body: JSON.stringify(payload)
       });

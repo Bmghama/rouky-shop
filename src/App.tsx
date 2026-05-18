@@ -9,7 +9,7 @@ import AdminLogin from "./components/admin/AdminLogin.tsx";
 import Dashboard from "./components/admin/Dashboard.tsx";
 import ProductDetails from "./components/shop/ProductDetails.tsx";
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "motion/react";
-import { MessageCircle, Star, Quote, ArrowRight, ShoppingBag, Instagram, Facebook, Music, Truck } from "lucide-react";
+import { MessageCircle, Star, Quote, ShoppingBag } from "lucide-react";
 import { CartProvider, useCart } from "./context/CartContext.tsx";
 import { CartDrawer } from "./components/shop/CartDrawer.tsx";
 import { ParallaxLogo } from "./components/layout/ParallaxLogo";
@@ -148,7 +148,6 @@ function Home() {
                <Quote className="mx-auto text-editorial-gold/40 mb-6 md:mb-8 w-12 md:w-20" strokeWidth={1} />
                <h2 className="text-4xl md:text-6xl font-serif italic mb-4">L'expérience Rouky</h2>
                <p className="label-caps tracking-[0.5em] text-editorial-gold/60 !text-[8px] md:!text-xs">Témoignages</p>
-                           <p className="label-caps tracking-[0.5em] text-editorial-gold/60 text-[8px]! md:text-xs">Témoignages</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 xl:gap-20">
               <ReviewCard name="Sira K." text="La qualité des robes est exceptionnelle. J'ai reçu ma commande en 24h via WhatsApp." />
@@ -232,13 +231,11 @@ function CategoryCard({ title, img, delay = 0 }: { title: string; img: string; d
       {/* Overlay */}
       <div className="absolute inset-0 bg-editorial-text/20 group-hover:bg-editorial-text/40 transition-all duration-700"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-editorial-text/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-        <div className="absolute inset-0 bg-linear-to-t from-editorial-text/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
       
       {/* Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 p-12 text-center">
         <h3 className="text-5xl font-serif mb-8 tracking-wide transform group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl">{title}</h3>
         <div className="w-16 h-[1px] bg-white mb-8 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
-          <div className="w-16 h-px bg-white mb-8 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
         <button className="label-caps tracking-[0.4em] !text-[9px] border-b border-white pb-2 opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-700 hover:text-editorial-gold hover:border-editorial-gold">
           Explorer la Gamme
         </button>
@@ -266,7 +263,6 @@ function ReviewCard({ name, text }: { name: string; text: string }) {
       <p className="text-white italic tracking-wide mb-12 leading-[1.8] text-xl font-light">"{text}"</p>
       <div className="flex items-center gap-6">
         <div className="w-12 h-[1px] bg-editorial-gold"></div>
-          <div className="w-12 h-px bg-editorial-gold"></div>
         <p className="label-caps !text-[10px] text-editorial-gold tracking-[0.4em]">{name}</p>
       </div>
       {/* Decorative Quote Mark */}
@@ -275,9 +271,15 @@ function ReviewCard({ name, text }: { name: string; text: string }) {
   );
 }
 function AdminPage() {
-  const [token, setToken] = useState(localStorage.getItem("admin_token") || "");
+  const [token, setToken] = useState(() => {
+    const saved = localStorage.getItem("admin_token");
+    return saved && saved !== "undefined" && saved !== "null" ? saved : "";
+  });
 
   const handleLogin = (newToken: string) => {
+    if (!newToken || newToken === "undefined" || newToken === "null") {
+      return;
+    }
     setToken(newToken);
     localStorage.setItem("admin_token", newToken);
   };
@@ -356,16 +358,16 @@ function CartFAB() {
 }
 
 function CategoryGrid() {
-  const [assets, setAssets] = useState<any[]>([]);
+  const [assets, setAssets] = useState<{ key: string; url: string }[]>([]);
   
   useEffect(() => {
     fetch("/api/site-assets")
       .then(res => res.json())
-      .then(setAssets)
-      .catch(err => console.error(err));
+      .then((data) => setAssets(Array.isArray(data) ? data : []))
+      .catch((err) => console.error(err));
   }, []);
 
-  const getImg = (key: string, fallback: string) => assets.find(a => a.key === key)?.url || fallback;
+  const getImg = (key: string, fallback: string) => assets.find((a) => a.key === key)?.url || fallback;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-12 px-6 md:px-0">
